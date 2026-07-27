@@ -1,0 +1,81 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  BUILD_DIR: build
+
+jobs:
+  build:
+    name: Build firmware (RP2350)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code (with submodules)
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      # Ubuntu's "gcc-arm-none-eabi" apt package ships an incomplete libstdc++
+      # (missing headers like <cstring>) that breaks this C++ firmware build.
+      # Use the official prebuilt ARM GNU Toolchain instead.
+      - name: Install ARM GNU Toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: 'latest'
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build build-essential python3 libusb-1.0-0-dev pkg-config
+
+      - name: Configure
+        run: cmake -S . -B ${{ env.BUILD_DIR }} -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build ${{ env.BUILD_DIR }} -j$(nproc)
+
+      - name: Collect firmware artifacts
+        run: |
+          mkdir -p artifacts
+          cp ${{ env.BUILD_DIR }}/picofacesm2.uf2 artifacts/picofacesm.uf2
+          cp ${{ env.BUILD_DIR }}/picofacesm2.elf artifacts/picofacesm.elf
+          cp ${{ env.BUILD_DIR }}/picofacesm2.bin artifacts/picofacesm.bin
+          cp ${{ env.BUILD_DIR }}/picofacesm2.elf.map artifacts/picofacesm.elf.map
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoFaceSM-firmware
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: PicoFaceSM-firmware
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: PicoFaceSM ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: artifacts/*
