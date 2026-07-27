@@ -45,10 +45,10 @@ jobs:
       - name: Collect firmware artifacts
         run: |
           mkdir -p artifacts
-          cp ${{ env.BUILD_DIR }}/picofacesm2.uf2 artifacts/picofacesm.uf2
-          cp ${{ env.BUILD_DIR }}/picofacesm2.elf artifacts/picofacesm.elf
-          cp ${{ env.BUILD_DIR }}/picofacesm2.bin artifacts/picofacesm.bin
-          cp ${{ env.BUILD_DIR }}/picofacesm2.elf.map artifacts/picofacesm.elf.map
+          cp ${{ env.BUILD_DIR }}/picofacesm.uf2 artifacts/picofacesm.uf2
+          cp ${{ env.BUILD_DIR }}/picofacesm.elf artifacts/picofacesm.elf
+          cp ${{ env.BUILD_DIR }}/picofacesm.bin artifacts/picofacesm.bin
+          cp ${{ env.BUILD_DIR }}/picofacesm.elf.map artifacts/picofacesm.elf.map
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
