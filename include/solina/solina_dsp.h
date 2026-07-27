@@ -186,6 +186,47 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
+/* Sinustabelle fuer die Steueroszillatoren                                  */
+/*                                                                           */
+/* Das Ensemble braucht sechs Sinuswerte je Abtastwert (zwei Reihen mal drei */
+/* Phasen). Auf dem RP2350 waeren das rund 265000 sinf-Aufrufe pro Sekunde;  */
+/* der Cortex-M33 rechnet die in Software. string-machine loest das in       */
+/* LFO3PhaseDual.dsp genauso ueber eine kleine interpolierte Tabelle         */
+/* (smallTableSin, 128 Werte).                                               */
+/* ------------------------------------------------------------------------ */
+#define SOLINA_SINTAB_BITS 8
+#define SOLINA_SINTAB_SIZE (1 << SOLINA_SINTAB_BITS)
+
+class SolinaSineTable
+{
+public:
+    static void init()
+    {
+        if (inited_)
+            return;
+        inited_ = true;
+        for (int i = 0; i <= SOLINA_SINTAB_SIZE; ++i)
+            tab_[i] = sinf(2.0f * (float) M_PI * ((float) i)
+                           / (float) SOLINA_SINTAB_SIZE);
+    }
+
+    /* Phase 0..1 -> Sinus, linear interpoliert */
+    static inline float lookup(float phase)
+    {
+        const float x  = phase * (float) SOLINA_SINTAB_SIZE;
+        const int   i  = (int) x;
+        const float mu = x - (float) i;
+        const int   j  = i & (SOLINA_SINTAB_SIZE - 1);
+        return tab_[j] + (tab_[j + 1] - tab_[j]) * mu;
+    }
+
+private:
+    static bool  inited_;
+    /* ein Wert mehr, damit die Interpolation ohne Sonderfall auskommt */
+    static float tab_[SOLINA_SINTAB_SIZE + 1];
+};
+
+/* ------------------------------------------------------------------------ */
 /* Weiche Begrenzung der Endstufe                                            */
 /*                                                                           */
 /* Der Output Amplifier des Originals begrenzt an seinen +/-15-V-Schienen    */

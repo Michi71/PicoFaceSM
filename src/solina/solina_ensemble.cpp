@@ -7,8 +7,13 @@
 #include <math.h>
 #include <string.h>
 
+bool  SolinaSineTable::inited_ = false;
+float SolinaSineTable::tab_[SOLINA_SINTAB_SIZE + 1];
+
 void SolinaEnsemble::init(float sampleRate)
 {
+    SolinaSineTable::init();
+
     samplerate_ = sampleRate;
 
     const int maxSamples =
@@ -164,8 +169,6 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
         return;
     }
 
-    const float twoPi = 2.0f * (float) M_PI;
-
     for (int i = 0; i < count; ++i)
     {
         /* Anti-Alias-Kette vor den Leitungen */
@@ -178,8 +181,8 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
             Line& ln = line_[l];
 
             /* Control Circuit: Summe beider Steueroszillatoren */
-            const float mod = sinf(twoPi * ph1_[l]) * depth1_
-                            + sinf(twoPi * ph2_[l]) * depth2_;
+            const float mod = SolinaSineTable::lookup(ph1_[l]) * depth1_
+                            + SolinaSineTable::lookup(ph2_[l]) * depth2_;
 
             ln.buf[ln.w] = x;
             ln.w = (ln.w + 1 < ln.size) ? (ln.w + 1) : 0;

@@ -86,6 +86,29 @@ danach folgen die Trimmer des Control Circuit und die Filterabstimmung, die im
 Original feste Bauteilwerte sind. Siehe `enum SolinaParam` in
 `include/solina/solina.h`.
 
+## Firmware bauen (RP2350)
+
+```bash
+git submodule update --init --depth 1
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Ergebnis: `build/picofacesm.uf2`. Zielplattform `rp2350-arm-s`, Board
+`sparkfun_promicro_rp2350`, 480 MHz — identisch zum Master-Projekt
+[PicoFaceRD](https://github.com/Michi71/PicoFaceRD), von dem Gerüst,
+Hardwareanbindung, Audio-Subsystem, USB-MIDI und Anzeige übernommen sind.
+
+| | |
+|---|---|
+| Flash | 81,7 kB (0,49 % von 16 MB) |
+| RAM | 20,1 kB |
+| davon Klangerzeugung | 25,3 kB Code, 1,0 kB BSS |
+
+Core 0 trägt den Audioproduzenten im Main-Loop plus USB, MIDI, Bedienung und
+Anzeige; der DMA-IRQ bleibt mikroskopisch. Einen Stimmenrechner auf Core 1
+wie bei PicoFaceRD braucht die Solina nicht — Core 1 ist frei.
+
 ## Host-Test (macOS)
 
 ```bash

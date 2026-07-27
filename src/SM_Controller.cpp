@@ -1,0 +1,215 @@
+/*
+  SM_Controller.cpp -- Bedienlogik fuer PicoFaceSM
+*/
+
+#include "SM_Controller.h"
+
+#include <stdio.h>
+#include <string.h>
+
+/* ------------------------------------------------------------------------ */
+/* Seitenaufteilung                                                          */
+/*                                                                           */
+/* Erst die Frontplatte des Originals (Register, Huellkurve, Ensemble),      */
+/* danach die Feinabstimmung, die im Geraet Bauteilwerte bzw. Trimmer sind.  */
+/* Umsortieren heisst: eine Zeile verschieben.                               */
+/* ------------------------------------------------------------------------ */
+struct SmPage {
+    const char* name;
+    int16_t     a;
+    int16_t     b;
+};
+
+static const SmPage kPages[] = {
+    { "PRESET",   SM_UI_PROGRAM,        SOLINA_VOLUME        },
+    { "STRINGS",  SOLINA_VIOLA,         SOLINA_VIOLIN        },
+    { "BRASS",    SOLINA_TRUMPET,       SOLINA_HORN          },
+    { "BASS",     SOLINA_CONTRABASS,    SOLINA_CELLO         },
+    { "BASS VOL", SOLINA_BASS_VOLUME,   SOLINA_TUNE          },
+    { "ENVELOPE", SOLINA_CRESCENDO,     SOLINA_SUSTAIN       },
+    { "ENSEMBLE", SOLINA_ENSEMBLE,      SOLINA_ENSEMBLE_TONE },
+    { "MOD DEPTH",SOLINA_TREMOLO_DEPTH, SOLINA_CHORUS_DEPTH  },
+    { "MOD RATE", SOLINA_TREMOLO_RATE,  SOLINA_CHORUS_RATE   },
+    { "TONE",     SOLINA_TONE_LOWPASS,  SOLINA_TONE_HIGHPASS },
+    { "COLOUR",   SOLINA_TONE_SHELF,    SOLINA_FORMANT       },
+    { "SYS",      SOLINA_SHAPER,        SM_UI_MIDICH         },
+};
+
+static const int kPageCount = (int) (sizeof(kPages) / sizeof(kPages[0]));
+
+/* Anzeigenamen der Engine-Parameter; SM_UI_* haengen hinten an. */
+static const char* kNames[SM_UI_COUNT] = {
+    "Contrabass", "Cello",      "Viola",      "Violin",
+    "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
+    "Sustain",    "Volume",     "Tune",       "Ensemble",
+    "Trem Rate",  "Trem Depth", "Chor Rate",  "Chor Depth",
+    "Ens Tone",   "Tone LP",    "Tone HP",    "Tone Shelf",
+    "Formant",    "Shaper",
+    "Program",    "MIDI Ch"
+};
+
+/* Schalterparameter springen zwischen 0 und 1, alles andere laeuft in
+ * Schritten von 2 % durch. */
+static bool isSwitch(int id)
+{
+    return id <= SOLINA_HORN || id == SOLINA_ENSEMBLE;
+}
+
+/* ------------------------------------------------------------------------ */
+SM_Controller::SM_Controller(SM_Midi& midi)
+    : midi_(midi)
+{
+    /* Schattenkopien aus dem Startprogramm ziehen */
+    syncFromProgram(program_);
+}
+
+void SM_Controller::syncFromProgram(int32_t program)
+{
+    if (program < 0 || program >= SOLINA_NPROGRAMS)
+        return;
+    program_ = program;
+    for (int i = 0; i < SOLINA_PARAM_COUNT; ++i)
+        shadow_[i] = solinaPrograms[program].param[i];
+}
+
+int SM_Controller::pageCount() const { return kPageCount; }
+
+const char* SM_Controller::pageName() const { return kPages[page_].name; }
+
+int SM_Controller::paramIdOf(int slot) const
+{
+    return slot == 0 ? kPages[page_].a : kPages[page_].b;
+}
+
+const char* SM_Controller::paramAName() const { return kNames[paramIdOf(0)]; }
+const char* SM_Controller::paramBName() const { return kNames[paramIdOf(1)]; }
+
+void SM_Controller::onEncoder1(int delta)
+{
+    if (delta == 0) return;
+    page_ = (page_ + delta) % kPageCount;
+    if (page_ < 0) page_ += kPageCount;
+}
+
+void SM_Controller::onEncoder2(int delta) { adjust(0, delta); }
+void SM_Controller::onEncoder3(int delta) { adjust(1, delta); }
+
+bool SM_Controller::homePage()
+{
+    if (page_ == 0)
+        return false;
+    page_ = 0;
+    return true;
+}
+
+void SM_Controller::sendParam(int id, float v)
+{
+    /* Promille ueber den IPC-Ring; die Audioseite teilt wieder durch 1000. */
+    uint16_t q = (uint16_t) (v * 1000.0f + 0.5f);
+    if (q > 1000) q = 1000;
+    ipc_send_param((uint8_t) id, q);
+}
+
+void SM_Controller::adjust(int slot, int delta)
+{
+    if (delta == 0) return;
+
+    const int id = paramIdOf(slot);
+
+    if (id == SM_UI_PROGRAM)
+    {
+        int32_t p = (program_ + delta) % SOLINA_NPROGRAMS;
+        if (p < 0) p += SOLINA_NPROGRAMS;
+        syncFromProgram(p);
+        ipc_send_param(SM_PARAM_PROGRAM, (uint16_t) p);
+        return;
+    }
+
+    if (id == SM_UI_MIDICH)
+    {
+        int c = (int) midiCh_ + delta;
+        if (c < 0) c = 0;
+        if (c > SM_MIDI_OMNI) c = SM_MIDI_OMNI;
+        midiCh_ = (uint8_t) c;
+        midi_.setRxChannel(midiCh_);
+        return;
+    }
+
+    if (isSwitch(id))
+    {
+        shadow_[id] = (shadow_[id] != 0.0f) ? 0.0f : 1.0f;
+    }
+    else
+    {
+        float v = shadow_[id] + 0.02f * (float) delta;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        shadow_[id] = v;
+    }
+    sendParam(id, shadow_[id]);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Anzeige                                                                   */
+/* ------------------------------------------------------------------------ */
+void SM_Controller::formatValue(int id, char* dst, size_t n) const
+{
+    if (id == SM_UI_PROGRAM)
+    {
+        snprintf(dst, n, "%d %s", (int) program_ + 1,
+                 solinaPrograms[program_].name);
+        return;
+    }
+    if (id == SM_UI_MIDICH)
+    {
+        if (midiCh_ >= SM_MIDI_OMNI) snprintf(dst, n, "Omni");
+        else                          snprintf(dst, n, "%d", (int) midiCh_ + 1);
+        return;
+    }
+    if (isSwitch(id))
+    {
+        snprintf(dst, n, "%s", shadow_[id] != 0.0f ? "on" : "off");
+        return;
+    }
+    snprintf(dst, n, "%d%%", (int) (shadow_[id] * 100.0f + 0.5f));
+}
+
+void SM_Controller::paramAText(char* dst, size_t n) const
+{
+    formatValue(paramIdOf(0), dst, n);
+}
+
+void SM_Controller::paramBText(char* dst, size_t n) const
+{
+    formatValue(paramIdOf(1), dst, n);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Persistenz                                                                */
+/* ------------------------------------------------------------------------ */
+void SM_Controller::exportSettings(SmSettingsV1& s) const
+{
+    s.program = (uint8_t) program_;
+    s.midiCh  = midiCh_;
+    for (int i = 0; i < SOLINA_PARAM_COUNT; ++i)
+        s.param[i] = (uint16_t) (shadow_[i] * 1000.0f + 0.5f);
+}
+
+void SM_Controller::importSettings(const SmSettingsV1& s)
+{
+    program_ = (s.program < SOLINA_NPROGRAMS) ? s.program : 0;
+    midiCh_  = (s.midiCh <= SM_MIDI_OMNI) ? s.midiCh : SM_MIDI_OMNI;
+    midi_.setRxChannel(midiCh_);
+
+    /* Erst das Programm setzen, dann die abweichenden Parameter darueber --
+     * so bleibt die Reihenfolge dieselbe wie beim Bedienen. */
+    ipc_send_param(SM_PARAM_PROGRAM, (uint16_t) program_);
+
+    for (int i = 0; i < SOLINA_PARAM_COUNT; ++i)
+    {
+        uint16_t q = s.param[i];
+        if (q > 1000) q = 1000;
+        shadow_[i] = (float) q / 1000.0f;
+        ipc_send_param((uint8_t) i, q);
+    }
+}
