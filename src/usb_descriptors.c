@@ -134,7 +134,7 @@ char const* string_desc_arr [] =
 {
   (const char[]) { 0x09, 0x04 }, 	// 0: is supported language is English (0x0409)
   "MIDICompany",                 	// 1: Manufacturer
-  "PicoFaceRD",             // 2: Product
+  "PicoFaceSM",             // 2: Product
   usb_serial,                 		// 3: Serials, should use chip ID
 };
 
