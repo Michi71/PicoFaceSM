@@ -133,20 +133,30 @@ static void sm_pc_cb(uint8_t p, uint8_t c)                  { smMidi.onProgramCh
 static void sm_pb_cb(uint16_t v, uint8_t c)                 { smMidi.onPitchBend(v, c); }
 
 /* ------------------------------------------------------------------------ */
+#if SM_SAFE_MODE
+#define SM_MARK(x) do { printf("SM: " x "\n"); } while (0)
+#else
+#define SM_MARK(x) do { } while (0)
+#endif
+
 int main(void)
 {
     pico_init();
+    SM_MARK("pico_init ok");
     smBridge.init();
+    SM_MARK("engine ok");
 
     board_init();
     usb_serial_init();
     tusb_init();
+    SM_MARK("usb ok");
 
     u8g2_Setup_sh1106_i2c_128x64_noname_f(&u8g2, U8G2_R0, u8x8_byte_pico_hw_i2c,
                                           u8x8_gpio_and_delay_pico);
     u8g2_InitDisplay(&u8g2);
     u8g2_SetPowerSave(&u8g2, 0);
     u8g2_ClearBuffer(&u8g2);
+    SM_MARK("display ok");
 
     /* Startbild zwei Sekunden halten, USB dabei am Leben lassen */
     sm_display_splash(&u8g2);
@@ -154,6 +164,7 @@ int main(void)
     while (!time_reached(splash_end)) { tud_task(); sleep_ms(1); }
 
     ap = init_audio(smBridge.currentSampleRate(), 6);
+    SM_MARK("audio ok");
     irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_I2S_DMA_IRQ, 0x00);
     irq_set_priority(USBCTRL_IRQ, 0xC0);
 
@@ -161,7 +172,9 @@ int main(void)
     encSel.init(); encA.init(); encB.init();
 
     smMidi.init();
+    SM_MARK("encoder+midi ok");
 
+#if !SM_SAFE_MODE
     veeprom_set_lock_hooks(sm_flash_lock, sm_flash_unlock);
     veeprom_init();
     {
@@ -173,6 +186,7 @@ int main(void)
             smController.importSettings(s);
         }
     }
+#endif
 
     usbmidi.setNoteOnCallback(sm_note_on_cb);
     usbmidi.setNoteOffCallback(sm_note_off_cb);
@@ -180,7 +194,18 @@ int main(void)
     usbmidi.setProgramChangeCallback(sm_pc_cb);
     usbmidi.setPitchBendCallback(sm_pb_cb);
 
+#if SM_SAFE_MODE
+    /* Sicherheitsmodus: ein gehaltener Akkord, damit sich der Audioweg ohne
+     * MIDI pruefen laesst. Kommt hier nichts, liegt es nicht am MIDI-Weg. */
+    smBridge.noteOn(48, 100);
+    smBridge.noteOn(55, 100);
+    smBridge.noteOn(64, 100);
+    smBridge.noteOn(67, 100);
+#endif
+
     sm_ui_draw();
+
+    SM_MARK("entering main loop");
 
     bool dirty = false;
     uint32_t last_draw = to_ms_since_boot(get_absolute_time());
@@ -241,6 +266,7 @@ int main(void)
         static uint32_t lastEditMs = 0;
         if (d1 || d2 || d3) { settingsDirty = true; lastEditMs = now; }
 
+#if !SM_SAFE_MODE
         if (settingsDirty && (now - lastEditMs) > 2000u)
         {
             SmSettingsV1 s;
@@ -248,6 +274,10 @@ int main(void)
             veeprom_save(&s, sizeof(s), SM_SETTINGS_VERSION);
             settingsDirty = false;
         }
+#else
+        (void) lastEditMs;
+        settingsDirty = false;
+#endif
 
         if (g_ui_flush_row >= 16 &&
             ((dirty && (now - last_draw > 50)) || (now - last_draw > 500)))

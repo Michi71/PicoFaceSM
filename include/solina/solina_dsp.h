@@ -140,9 +140,26 @@ public:
         if (k > 1.0f) k = 1.0f;
         k_  = k;
         lm_ = -sqrtf(k * k * k) / (k * k * k);
+
+        /*
+         * Die Kennlinie geht nicht durch den Ursprung: bei Eingang 0 liefert
+         * sie einen Gleichanteil (0,099 bei Amount 1,0). Ueber fuenf
+         * Tastaturgruppen und zwei Streicherregister summiert ergibt das beim
+         * Einschalten einen Sprung, den die Gleichspannungssperre dahinter
+         * erst in einigen Millisekunden abbaut -- hoerbar als Plopp.
+         *
+         * string-machine haengt in AsymWaveshaper.dsp direkt hinter den
+         * Wellenformer ein fi.dcblockerat(35.). Den Nullpunkt abzuziehen ist
+         * dasselbe Ergebnis ohne Filter: kein Einschwingen, keine
+         * Phasendrehung im Bass, keine Rechenzeit.
+         */
+        offset_ = shape(0.0f);
     }
 
-    inline float process(float x) const
+    inline float process(float x) const { return shape(x) - offset_; }
+
+private:
+    inline float shape(float x) const
     {
         const float z = 2.0f / 3.0f;
         float v = x - z;
@@ -155,9 +172,9 @@ public:
         return v + z;
     }
 
-private:
     float k_ = 1.0f;
     float lm_ = -1.0f;
+    float offset_ = 0.0f;
 };
 
 /* ------------------------------------------------------------------------ */

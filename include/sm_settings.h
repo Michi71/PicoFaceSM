@@ -15,8 +15,11 @@
 #include <stdint.h>
 #include "solina/solina.h"
 
-#define SM_SETTINGS_VERSION 1u
+#define SM_SETTINGS_VERSION 2u
 
+/* Version 2: Parameterliste um den Phaser erweitert (drei Eintraege), damit
+ * verschieben sich alle Indizes ab SOLINA_TONE_LOWPASS. Aeltere Datensaetze
+ * werden von veeprom anhand der Version verworfen. */
 struct __attribute__((packed)) SmSettingsV1 {
     uint8_t  program;                        /* 0..7                  */
     uint8_t  midiCh;                         /* 0..15, 16 = Omni      */

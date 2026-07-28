@@ -64,6 +64,7 @@ add_executable(picofacesm
     src/solina/solina_keyboard.cpp
     src/solina/solina_registers.cpp
     src/solina/solina_ensemble.cpp
+    src/solina/solina_phaser.cpp
 )
 
 target_link_libraries(picofacesm PRIVATE
@@ -81,7 +82,6 @@ target_link_libraries(picofacesm PRIVATE
     hardware_sync
     hardware_flash
     pico_unique_id
-    pico_bootsel_via_double_reset
     pico_util_buffer
     pico_multicore
     pico_stdio_uart
@@ -92,8 +92,59 @@ target_link_libraries(picofacesm PRIVATE
     u8g2
 )
 
+# Diagnosebau: -DSM_SAFE_MODE=ON
+#   - kein veeprom (weder Laden noch Speichern)
+#   - gehaltener Akkord beim Start, damit Audio ohne MIDI pruefbar ist
+#   - Fortschrittsmarken auf UART0 (GPIO 0/1, 115200)
+# Doppeltipp auf RESET schaltet in den BOOTSEL-Modus.
+#
+# Standardmaessig AUS, und zwar aus einem konkreten Grund: mit einer
+# Waveshare-Pico-Audio-Karte und 3-W-Lautsprechern bricht die Versorgung beim
+# Einstecken kurz ein, der Chip macht einen Brownout-Reset -- und die
+# Bibliothek liest das als Doppeltipp und geht in den BOOTSEL-Modus statt ins
+# Programm. Auf dem RP2350 liegt das Merkmal im POWMAN-Register
+# chip_reset.DOUBLE_TAP, das den Einbruch ueberlebt; ein kuerzeres Zeitfenster
+# hilft daher nicht. Mit Kopfhoerer statt Lautsprecher tritt es nicht auf.
+#
+# Die BOOTSEL-Taste funktioniert unabhaengig davon weiter.
+option(SM_DOUBLE_RESET "RESET-Doppeltipp fuehrt in den BOOTSEL-Modus" OFF)
+if (SM_DOUBLE_RESET)
+    target_link_libraries(picofacesm PRIVATE pico_bootsel_via_double_reset)
+else()
+    message(STATUS "PicoFaceSM: RESET-Doppeltipp ABGESCHALTET (Starttest)")
+endif()
+
+# Phaser (Behringer-Zutat) uebersetzen. Nur zur Fehlersuche abschaltbar.
+option(SM_PHASER "Phaser einbauen" ON)
+if (NOT SM_PHASER)
+    target_compile_definitions(picofacesm PRIVATE SM_NO_PHASER=1)
+    message(STATUS "PicoFaceSM: Phaser ABGESCHALTET (Fehlersuche)")
+endif()
+
+option(SM_SAFE_MODE "Diagnosebau ohne veeprom, mit Dauerton" OFF)
+if (SM_SAFE_MODE)
+    target_compile_definitions(picofacesm PRIVATE SM_SAFE_MODE=1)
+    message(STATUS "PicoFaceSM: SICHERHEITSMODUS aktiv (kein veeprom, Dauerton)")
+else()
+    target_compile_definitions(picofacesm PRIVATE SM_SAFE_MODE=0)
+endif()
+
+# Systemtakt. ON = 480 MHz (wie das Master-Projekt), OFF = 444 MHz.
+#
+# Standard ist 444 MHz, und zwar gemessen: auf diesem Board startet die
+# Firmware bei 480 MHz nicht zuverlaessig, bei 444 MHz stabil. Der Kommentar
+# in pico_init() haelt schon fest, dass 504 MHz auf diesem Chip gar nicht
+# booteten -- 480 MHz war der Rueckfallschritt und ist offenbar ebenfalls zu
+# knapp. Die Rechenreserve reicht bequem: gemessene Spitzenlast 40 % bei
+# 480 MHz, also rund 43 % bei 444 MHz.
+option(SM_CLOCK_480 "Systemtakt 480 MHz statt 444 MHz" OFF)
+if (SM_CLOCK_480)
+    target_compile_definitions(picofacesm PRIVATE RD_CLOCK_504=1)
+else()
+    message(STATUS "PicoFaceSM: Systemtakt 444 MHz")
+endif()
+
 target_compile_definitions(picofacesm PRIVATE
-    RD_CLOCK_504=1        # 480 MHz, gleicher Takt wie das Master-Projekt
     USE_AUDIO_I2S=1
     PICO_USE_SW_SPIN_LOCKS=1
     PICO_AUDIO_I2S_DATA_PIN=26

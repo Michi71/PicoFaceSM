@@ -21,7 +21,8 @@ SRC=("$ROOT/test/solina_test.cpp"
      "$ROOT/src/solina/solina.cpp"
      "$ROOT/src/solina/solina_keyboard.cpp"
      "$ROOT/src/solina/solina_registers.cpp"
-     "$ROOT/src/solina/solina_ensemble.cpp")
+     "$ROOT/src/solina/solina_ensemble.cpp"
+     "$ROOT/src/solina/solina_phaser.cpp")
 
 echo "[build] $CXX ${CXXFLAGS[*]} ..."
 "$CXX" "${CXXFLAGS[@]}" "${SRC[@]}" -o "$OUT" "${LDFLAGS[@]}"

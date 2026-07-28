@@ -48,7 +48,10 @@ static inline float solinaSemis(float t)
     /* TREMOLO_DEPTH */ 0.1000f, \
     /* CHORUS_RATE   */ 0.4675f, /* 0.58 Hz */ \
     /* CHORUS_DEPTH  */ 0.9055f, \
-    /* ENSEMBLE_TONE */ 0.2000f
+    /* ENSEMBLE_TONE */ 0.2000f, \
+    /* PHASER        */ 0.0000f, \
+    /* PHASER_RATE   */ 0.2500f, \
+    /* PHASER_COLOR  */ 0.5000f
 
 const SolinaProgram solinaPrograms[SOLINA_NPROGRAMS] = {
 /*        CBass  Cello  Viola  Violin Trump  Horn   BassVol Cresc  Sust   Vol    Tune */
@@ -119,6 +122,7 @@ void Solina::setSampleRate(float sampleRate)
     keyboard_.init(sampleRate);
     registers_.init(sampleRate);
     ensemble_.init(sampleRate);
+    phaser_.init(sampleRate);
 
     outDc_.init(sampleRate, 20.0f);
     correctionL_.init(sampleRate);
@@ -183,6 +187,19 @@ void Solina::applyParameter(int32_t index, float value)
             ensemble_.setReconScale(powf(2.0f, (value - 0.5f) * 2.0f));
             break;
 
+        /* Phaser (Behringer-Zutat) */
+        case SOLINA_PHASER:
+            phaser_.setEnabled(value != 0.0f);
+            break;
+        case SOLINA_PHASER_RATE:
+            /* exponentiell, damit der Regelweg gleichmaessig wirkt */
+            phaser_.setRate(solinaTime(value, SOLINA_PHASER_HZ_MIN,
+                                              SOLINA_PHASER_HZ_MAX));
+            break;
+        case SOLINA_PHASER_COLOR:
+            phaser_.setColor(value);
+            break;
+
         case SOLINA_TONE_LOWPASS:
         case SOLINA_TONE_HIGHPASS:
         case SOLINA_TONE_SHELF:
@@ -232,13 +249,14 @@ static const char* solinaParamNames[SOLINA_PARAM_COUNT] = {
     "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
     "Sustain",    "Volume",     "Tune",       "Ensemble",
     "Trem Rate",  "Trem Depth", "Chor Rate",  "Chor Depth",
-    "Ens Tone",   "Tone LP",    "Tone HP",    "Tone Shelf",
-    "Formant",    "Shaper"
+    "Ens Tone",   "Phaser",     "Phas Rate",  "Phas Color",
+    "Tone LP",    "Tone HP",    "Tone Shelf", "Formant",
+    "Shaper"
 };
 
 static bool solinaIsSwitch(int32_t i)
 {
-    return i <= SOLINA_HORN || i == SOLINA_ENSEMBLE;
+    return i <= SOLINA_HORN || i == SOLINA_ENSEMBLE || i == SOLINA_PHASER;
 }
 
 void Solina::getParameterName(int32_t index, char* text) const
@@ -255,7 +273,8 @@ void Solina::getParameterLabel(int32_t index, char* text) const
         case SOLINA_SUSTAIN:            snprintf(text, 8, "%s", "s");     break;
         case SOLINA_TREMOLO_RATE:
         case SOLINA_CHORUS_RATE:
-        case SOLINA_ENSEMBLE_TONE:      snprintf(text, 8, "%s", "Hz");    break;
+        case SOLINA_ENSEMBLE_TONE:
+        case SOLINA_PHASER_RATE:        snprintf(text, 8, "%s", "Hz");    break;
         case SOLINA_TUNE:               snprintf(text, 8, "%s", "st");    break;
         case SOLINA_TONE_LOWPASS:
         case SOLINA_TONE_HIGHPASS:
@@ -292,6 +311,9 @@ void Solina::getParameterDisplay(int32_t index, char* text) const
         case SOLINA_ENSEMBLE_TONE:
             snprintf(text, 8, "%.0f", SOLINA_RECON_F2
                      * powf(2.0f, (v - 0.5f) * 2.0f)); break;
+        case SOLINA_PHASER_RATE:
+            snprintf(text, 8, "%.2f", solinaTime(v, SOLINA_PHASER_HZ_MIN,
+                                                    SOLINA_PHASER_HZ_MAX)); break;
         case SOLINA_TONE_LOWPASS:
         case SOLINA_TONE_HIGHPASS:
         case SOLINA_TONE_SHELF:
@@ -385,6 +407,7 @@ void Solina::resetVoices()
     keyboard_.reset();
     registers_.reset();
     ensemble_.reset();
+    phaser_.reset();
     divider_.reset();
     outDc_.clear();
     correctionL_.clear();
@@ -421,6 +444,12 @@ void Solina::renderBlock(int frames)
         mono_[i] = outDc_.process(mono_[i]);
 
     ensemble_.process(mono_, left_, right_, frames);
+
+    /* Phaser als Einschleifpunkt hinter dem Ensemble -- beim Behringer sind
+     * dafuer eigene Buchsen "Phaser in/out" nach aussen gefuehrt. */
+#if !SM_NO_PHASER
+    phaser_.process(left_, right_, frames);
+#endif
 
     /* Output Amplifier + Correction Filter */
     for (int i = 0; i < frames; ++i)

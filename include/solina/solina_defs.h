@@ -132,6 +132,17 @@
 #define SOLINA_RECON_Q   0.7071f
 
 /* ------------------------------------------------------------------------ */
+/* Phaser -- Zutat des Behringer-Nachbaus, nicht im Original                 */
+/*                                                                           */
+/* Behringer-Handbuch, "Modulation Section": Buttons Modulation, phaser /    */
+/* Controls Color, rate. Sechs Allpassstufen, Durchlauf 200 Hz .. 1600 Hz.   */
+/* ------------------------------------------------------------------------ */
+#define SOLINA_PHASER_HZ_MIN   0.05f
+#define SOLINA_PHASER_HZ_MAX   8.0f
+#define SOLINA_PHASER_F_MIN  200.0f
+#define SOLINA_PHASER_F_MAX 1600.0f
+
+/* ------------------------------------------------------------------------ */
 /* Endstufe                                                                  */
 /*                                                                           */
 /* Schwelle der weichen Begrenzung. Unterhalb -3,1 dBFS ist die Kennlinie    */

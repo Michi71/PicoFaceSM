@@ -30,9 +30,13 @@ static const SmPage kPages[] = {
     { "ENSEMBLE", SOLINA_ENSEMBLE,      SOLINA_ENSEMBLE_TONE },
     { "MOD DEPTH",SOLINA_TREMOLO_DEPTH, SOLINA_CHORUS_DEPTH  },
     { "MOD RATE", SOLINA_TREMOLO_RATE,  SOLINA_CHORUS_RATE   },
+    { "PHASER",   SOLINA_PHASER,        SOLINA_PHASER_RATE   },
+    { "PHAS COL", SOLINA_PHASER_COLOR,  SOLINA_SHAPER        },
     { "TONE",     SOLINA_TONE_LOWPASS,  SOLINA_TONE_HIGHPASS },
     { "COLOUR",   SOLINA_TONE_SHELF,    SOLINA_FORMANT       },
-    { "SYS",      SOLINA_SHAPER,        SM_UI_MIDICH         },
+    /* 27 Bedienwerte auf 14 Seiten -- eine Haelfte bleibt uebrig, deshalb
+     * steht Volume hier ein zweites Mal (praktisch, weil man es oft braucht). */
+    { "SYS",      SM_UI_MIDICH,         SOLINA_VOLUME        },
 };
 
 static const int kPageCount = (int) (sizeof(kPages) / sizeof(kPages[0]));
@@ -43,16 +47,16 @@ static const char* kNames[SM_UI_COUNT] = {
     "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
     "Sustain",    "Volume",     "Tune",       "Ensemble",
     "Trem Rate",  "Trem Depth", "Chor Rate",  "Chor Depth",
-    "Ens Tone",   "Tone LP",    "Tone HP",    "Tone Shelf",
-    "Formant",    "Shaper",
-    "Program",    "MIDI Ch"
+    "Ens Tone",   "Phaser",     "Phas Rate",  "Phas Color",
+    "Tone LP",    "Tone HP",    "Tone Shelf", "Formant",
+    "Shaper",     "Program",    "MIDI Ch"
 };
 
 /* Schalterparameter springen zwischen 0 und 1, alles andere laeuft in
- * Schritten von 2 % durch. */
+ * Schritten von 1 % durch (siehe adjust()). */
 static bool isSwitch(int id)
 {
-    return id <= SOLINA_HORN || id == SOLINA_ENSEMBLE;
+    return id <= SOLINA_HORN || id == SOLINA_ENSEMBLE || id == SOLINA_PHASER;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -141,10 +145,18 @@ void SM_Controller::adjust(int slot, int delta)
     }
     else
     {
-        float v = shadow_[id] + 0.02f * (float) delta;
-        if (v < 0.0f) v = 0.0f;
-        if (v > 1.0f) v = 1.0f;
-        shadow_[id] = v;
+        /*
+         * In ganzen Prozent rechnen statt einen Betrag zu addieren. Die
+         * Preset-Werte liegen nicht auf dem Raster (Volume in "Contrabass"
+         * ist 0,827), deshalb waeren sonst runde Werte nie erreichbar -- man
+         * kaeme von 83 nur auf 81, 79, 77. Der erste Klick rastet auf das
+         * Prozentraster ein, danach geht jeder ganze Wert.
+         */
+        int pct = (int) (shadow_[id] * 100.0f + 0.5f);
+        pct += delta;
+        if (pct < 0)   pct = 0;
+        if (pct > 100) pct = 100;
+        shadow_[id] = (float) pct / 100.0f;
     }
     sendParam(id, shadow_[id]);
 }

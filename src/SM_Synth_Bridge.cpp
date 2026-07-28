@@ -46,8 +46,24 @@ void RAM_HOT(SM_Synth_Bridge::fill_buffer_i32)(int32_t* out, int length)
 
         for (int i = 0; i < chunk; ++i)
         {
-            out[(done + i) * 2 + 0] = (int32_t) (l[i] * 32767.0f);
-            out[(done + i) * 2 + 1] = (int32_t) (r[i] * 32767.0f);
+            /*
+             * Das I2S-Format ist S32: der Abtastwert muss linksbuendig im
+             * 32-Bit-Wort stehen. Hier auf 24 Bit skaliert und um 8 Bit nach
+             * oben geschoben -- das Master-Projekt nutzt 16 Bit mit << 16,
+             * die PIO schiebt so oder so 32 Bit hinaus.
+             *
+             * Die Engine begrenzt bereits weich auf +/-1, die Klemmung ist
+             * nur Absicherung gegen Rundung.
+             */
+            int32_t dl = (int32_t) (l[i] * 8388607.0f);
+            int32_t dr = (int32_t) (r[i] * 8388607.0f);
+            if (dl >  8388607) dl =  8388607;
+            if (dl < -8388608) dl = -8388608;
+            if (dr >  8388607) dr =  8388607;
+            if (dr < -8388608) dr = -8388608;
+
+            out[(done + i) * 2 + 0] = dl << 8;
+            out[(done + i) * 2 + 1] = dr << 8;
         }
 
         done += chunk;

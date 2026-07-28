@@ -7,6 +7,7 @@
       SolinaKeyboard   Manual Circuit + Gate Circuit + Sustain Circuits
       SolinaRegisters  Gate Output Circuit + Formant Circuit + Bass Circuit
       SolinaEnsemble   Control Circuit + Modulator Circuit I/II/III
+      SolinaPhaser     Phaser (nicht im Original, vom Behringer-Nachbau)
 
   Die oeffentliche Schnittstelle ist an mdaEPiano (PicoFaceCP) angelehnt,
   damit die RP2350-Anbindung mechanisch bleibt.
@@ -20,6 +21,7 @@
 #include "solina_keyboard.h"
 #include "solina_registers.h"
 #include "solina_ensemble.h"
+#include "solina_phaser.h"
 
 /* ------------------------------------------------------------------------ */
 /* Parameter                                                                 */
@@ -51,6 +53,9 @@ enum SolinaParam {
     SOLINA_CHORUS_RATE,     /* Control Circuit, Trimmer 48           */
     SOLINA_CHORUS_DEPTH,
     SOLINA_ENSEMBLE_TONE,   /* Rekonstruktionsfilter hinter den BBD */
+    SOLINA_PHASER,          /* Phaser an/aus              (Schalter) */
+    SOLINA_PHASER_RATE,     /* Durchlaufgeschwindigkeit              */
+    SOLINA_PHASER_COLOR,    /* Rueckkopplung                         */
 
     /* Klangabstimmung (im Original Bauteilwerte) */
     SOLINA_TONE_LOWPASS,    /* Gate Output Circuit, Tiefpass         */
@@ -122,6 +127,7 @@ private:
     SolinaKeyboard  keyboard_;
     SolinaRegisters registers_;
     SolinaEnsemble  ensemble_;
+    SolinaPhaser    phaser_;
 
     /* Register Circuit -> Output Amplifier */
     SolinaDCBlock   outDc_;

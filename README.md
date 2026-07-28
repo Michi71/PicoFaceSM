@@ -82,9 +82,16 @@ Cimalando angelehnt (Boost Software License 1.0, Referenzbaum unter
 22 Parameter, jeweils `0.0 … 1.0`. Die ersten elf entsprechen genau der
 Frontplatte (Behringer-Handbuch: „Buttons Contrabass, cello, viola, violin,
 trumpet, horn / Controls Volume bass, crescendo, sustain, volume, tune"),
-danach folgen die Trimmer des Control Circuit und die Filterabstimmung, die im
-Original feste Bauteilwerte sind. Siehe `enum SolinaParam` in
-`include/solina/solina.h`.
+danach folgen die Trimmer des Control Circuit, der Phaser und die
+Filterabstimmung, die im Original feste Bauteilwerte sind. Siehe
+`enum SolinaParam` in `include/solina/solina.h`.
+
+Die Bedienung verteilt sie auf 14 Seiten (Drehgeber 1 blättert, Taster
+springt auf Seite 1 zurück, Drehgeber 2 und 3 bedienen die zwei Parameter der
+Seite). Die Seitentabelle steht als Datenstruktur oben in
+`src/SM_Controller.cpp`. Werte laufen in Schritten von 1 % und rasten beim
+ersten Klick auf das Prozentraster ein — die Preset-Werte liegen nicht darauf
+(Volume in „Contrabass" ist 0,827), sonst wären runde Werte nie erreichbar.
 
 ## Firmware bauen (RP2350)
 
@@ -95,7 +102,8 @@ cmake --build build
 ```
 
 Ergebnis: `build/picofacesm.uf2`. Zielplattform `rp2350-arm-s`, Board
-`sparkfun_promicro_rp2350`, 480 MHz — identisch zum Master-Projekt
+`sparkfun_promicro_rp2350`, **444 MHz** — Gerüst, Hardwareanbindung,
+Audio-Subsystem, USB-MIDI und Anzeige stammen aus dem Master-Projekt
 [PicoFaceRD](https://github.com/Michi71/PicoFaceRD), von dem Gerüst,
 Hardwareanbindung, Audio-Subsystem, USB-MIDI und Anzeige übernommen sind.
 
@@ -108,6 +116,31 @@ Hardwareanbindung, Audio-Subsystem, USB-MIDI und Anzeige übernommen sind.
 Core 0 trägt den Audioproduzenten im Main-Loop plus USB, MIDI, Bedienung und
 Anzeige; der DMA-IRQ bleibt mikroskopisch. Einen Stimmenrechner auf Core 1
 wie bei PicoFaceRD braucht die Solina nicht — Core 1 ist frei.
+
+Gemessen auf dem Gerät (Waveshare Pico Audio, 44,1 kHz):
+
+| | |
+|---|---|
+| Spitzenlast `P` beim Spielen | max. 40 % |
+| I2S-Unterläufe `U` | 0 |
+| verworfene IPC-Pakete `D` | 0 |
+
+44,1 kHz sind damit bestätigt — weder eine niedrigere Samplerate noch eine
+Verlagerung auf Core 1 sind nötig.
+
+### RESET-Doppeltipp ist abgeschaltet
+
+`pico_bootsel_via_double_reset` ist **nicht** mitgelinkt (`SM_DOUBLE_RESET`,
+Vorgabe `OFF`). Mit einer Waveshare-Pico-Audio-Karte und 3-W-Lautsprechern
+bricht die Versorgung beim Einstecken durch den Einschaltstrom kurz ein, der
+Chip macht einen Brownout-Reset — und die Bibliothek liest das als Doppeltipp
+und geht in den BOOTSEL-Modus statt ins Programm. Auf dem RP2350 liegt das
+Merkmal im POWMAN-Register `chip_reset.DOUBLE_TAP`, das den Einbruch
+überlebt; ein kürzeres Zeitfenster hilft deshalb nicht. Mit Kopfhörer statt
+Lautsprecher tritt es nicht auf.
+
+Die BOOTSEL-Taste funktioniert unabhängig davon weiter. Wer den Doppeltipp
+zurück will: `cmake -S . -B build -DSM_DOUBLE_RESET=ON`.
 
 ## Host-Test (macOS)
 
@@ -201,7 +234,22 @@ Tasten belegt, bleibt eine weitere Taste stumm — das Original hat auch nur
    Verwendet wird die digitale Variante desselben 3-Phasen-Delays.
 8. **Anschlagdynamik wird ignoriert** — die Torschaltung des Originals kennt nur
    auf und zu.
-9. **Weiche Begrenzung in der Endstufe** statt hartem Abschneiden an der
+9. **Phaser** — im Original gibt es keinen. Der Behringer-Nachbau hat einen
+   („Modulation Section: Buttons Modulation, phaser / Controls Color, rate",
+   dazu Klinkenbuchsen „Phaser in/out" auf der Rückseite), deshalb sitzt er
+   hier als Einschleifpunkt hinter dem Ensemble. Sechs Allpassstufen je Kanal,
+   Durchlauf 200 Hz…1600 Hz, rechter Kanal 90° versetzt, Rückkopplung über
+   „Color". Standardmäßig **aus**. Kostet 0,09 % eines M4-Cores.
+10. **Der Wellenformer ist nullpunktkorrigiert.** Die Kennlinie aus
+    `AsymWaveshaper.dsp` geht nicht durch den Ursprung — bei Stille liefert
+    sie 0,099. Über fünf Tastaturgruppen und zwei Streicherregister summiert
+    ergab das beim Einschalten einen Sprung von −21 dBFS, den die
+    Gleichspannungssperre erst in einigen Millisekunden abbaute: ein hörbares
+    Ploppen. string-machine hängt dafür ein `fi.dcblockerat(35.)` direkt
+    hinter den Wellenformer; den Nullpunkt abzuziehen ist dasselbe Ergebnis
+    ohne Einschwingen, ohne Phasendrehung im Bass und ohne Rechenzeit. Der
+    Ausgang steht jetzt bei −240 dBFS, also exakt still.
+11. **Weiche Begrenzung in der Endstufe** statt hartem Abschneiden an der
    `int16`-Grenze. Unterhalb −3,1 dBFS ist die Kennlinie exakt linear, darüber
    läuft sie asymptotisch gegen 1,0. Normales Spiel wird dadurch überhaupt
    nicht angefasst (0,000 % der Abtastwerte bei einem Akkord und bei 20

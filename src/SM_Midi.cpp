@@ -14,6 +14,7 @@
 //   CC 73  Crescendo      Anstiegszeit der Sustain-Schaltung
 //   CC 80..85             Registerzuege Contrabass..Horn
 //   CC 93  Ensemble       Modulator-Schaltungen an/aus
+//   CC 95  Phaser         an/aus (nicht im Original, vom Behringer-Nachbau)
 //   CC 120 All Sound Off
 //   CC 121 Reset All Ctrl Pedal aus, Pitchbend auf Mitte
 //   CC 123 All Notes Off
@@ -86,8 +87,9 @@ void SM_Midi::onControlChange(uint8_t cc, uint8_t val, uint8_t ch)
         case 84: ipc_send_param(SOLINA_TRUMPET,    val >= 64 ? 1000 : 0); break;
         case 85: ipc_send_param(SOLINA_HORN,       val >= 64 ? 1000 : 0); break;
 
-        // Ensemble auf dem ueblichen Chorus-Schalter
+        // Ensemble auf dem ueblichen Chorus-Schalter, Phaser auf CC 95
         case 93: ipc_send_param(SOLINA_ENSEMBLE,   val >= 64 ? 1000 : 0); break;
+        case 95: ipc_send_param(SOLINA_PHASER,     val >= 64 ? 1000 : 0); break;
 
         // Huellkurve als Dauerwerte (0..127 -> 0..1000 Promille)
         case 73: ipc_send_param(SOLINA_CRESCENDO, (uint16_t)(val * 1000 / 127)); break;
