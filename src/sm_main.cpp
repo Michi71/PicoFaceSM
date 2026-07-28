@@ -305,8 +305,13 @@ static void sm_ui_draw()
     smController.paramAText(va, sizeof(va));
     smController.paramBText(vb, sizeof(vb));
 
-    snprintf(m.lineA, sizeof(m.lineA), "%s %s", smController.paramAName(), va);
-    snprintf(m.lineB, sizeof(m.lineB), "%s %s", smController.paramBName(), vb);
+    /* Leere Beschriftung = der Wert beschreibt sich selbst (siehe kNames). */
+    const char* na = smController.paramAName();
+    const char* nb = smController.paramBName();
+    if (na[0]) snprintf(m.lineA, sizeof(m.lineA), "%s %s", na, va);
+    else       snprintf(m.lineA, sizeof(m.lineA), "%s", va);
+    if (nb[0]) snprintf(m.lineB, sizeof(m.lineB), "%s %s", nb, vb);
+    else       snprintf(m.lineB, sizeof(m.lineB), "%s", vb);
 
     snprintf(m.footer, sizeof(m.footer), "P%d U%lu D%lu N%lu",
              (int) smBridge.cpuLoadPeakPercent(),

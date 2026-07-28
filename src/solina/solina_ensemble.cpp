@@ -91,6 +91,11 @@ void SolinaEnsemble::setChorusDepth(float d)
     depth2_ = (d < 0.0f) ? 0.0f : ((d > 1.0f) ? 1.0f : d);
 }
 
+void SolinaEnsemble::setWidth(float w)
+{
+    width_ = (w < 0.0f) ? 0.0f : ((w > 1.0f) ? 1.0f : w);
+}
+
 void SolinaEnsemble::setReconScale(float s)
 {
     if (s < 0.25f) s = 0.25f;
@@ -199,7 +204,26 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
 
         /* Ausgangsmatrix der drei Modulatorschaltungen, danach der
          * Rekonstruktionstiefpass (Low-Pass Filter TR4-5). */
-        outL[i] = reconL2_.process(reconL1_.process(d[0] + d[1] - d[2]));
-        outR[i] = reconR2_.process(reconR1_.process(d[0] - d[1] - d[2]));
+        /*
+         * Ausgangsmischung ueber Mitte und Seite.
+         *
+         * Das Original ist mono -- "Low output" und "High output" im
+         * Schaltplan sind zwei Pegel, nicht zwei Kanaele. Eine Stereomatrix
+         * ist also ohnehin eine Zutat. string-machine nimmt dafuer
+         * L = d1+d2-d3, R = d1-d2-d3; das erzeugt zwar viel Breite, aber die
+         * Vorzeichen loeschen einen gehaltenen Ton periodisch um bis zu
+         * 10 dB aus -- hoerbar als Pumpen.
+         *
+         * Hier bildet die Summe der drei Leitungen die Mitte (die pumpt
+         * kaum), die Differenz von Leitung 1 und 3 die Seite. Bei gleicher
+         * Breite halbiert das den Hub.
+         */
+        const float mid  = (d[0] + d[1] + d[2]) * (2.0f / 3.0f);
+        const float side = (d[0] - d[2]) * width_;
+        const float mL = mid + side;
+        const float mR = mid - side;
+
+        outL[i] = reconL2_.process(reconL1_.process(mL));
+        outR[i] = reconR2_.process(reconR1_.process(mR));
     }
 }

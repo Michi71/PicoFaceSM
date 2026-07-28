@@ -34,22 +34,25 @@ static const SmPage kPages[] = {
     { "PHAS COL", SOLINA_PHASER_COLOR,  SOLINA_SHAPER        },
     { "TONE",     SOLINA_TONE_LOWPASS,  SOLINA_TONE_HIGHPASS },
     { "COLOUR",   SOLINA_TONE_SHELF,    SOLINA_FORMANT       },
-    /* 27 Bedienwerte auf 14 Seiten -- eine Haelfte bleibt uebrig, deshalb
-     * steht Volume hier ein zweites Mal (praktisch, weil man es oft braucht). */
-    { "SYS",      SM_UI_MIDICH,         SOLINA_VOLUME        },
+    { "SYS",      SM_UI_MIDICH,         SOLINA_ENSEMBLE_WIDTH },
 };
 
 static const int kPageCount = (int) (sizeof(kPages) / sizeof(kPages[0]));
 
-/* Anzeigenamen der Engine-Parameter; SM_UI_* haengen hinten an. */
+/* Anzeigenamen der Engine-Parameter; SM_UI_* haengen hinten an.
+ *
+ * Ein leerer Name heisst: der Wert beschreibt sich selbst und wird ohne
+ * Beschriftung angezeigt. Beim Programm ist das so -- die Kopfzeile sagt
+ * bereits PRESET, und "Program 6 Strings+Brass" waere mit 25 Zeichen
+ * doppelt so lang wie die Zeile (Font 8x13B, 15 Zeichen ab x=4). */
 static const char* kNames[SM_UI_COUNT] = {
     "Contrabass", "Cello",      "Viola",      "Violin",
     "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
     "Sustain",    "Volume",     "Tune",       "Ensemble",
     "Trem Rate",  "Trem Depth", "Chor Rate",  "Chor Depth",
-    "Ens Tone",   "Phaser",     "Phas Rate",  "Phas Color",
-    "Tone LP",    "Tone HP",    "Tone Shelf", "Formant",
-    "Shaper",     "Program",    "MIDI Ch"
+    "Ens Tone",   "Ens Width",  "Phaser",     "Phas Rate",
+    "Phas Color", "Tone LP",    "Tone HP",    "Tone Shelf",
+    "Formant",    "Shaper",     "",           "MIDI Ch"
 };
 
 /* Schalterparameter springen zwischen 0 und 1, alles andere laeuft in

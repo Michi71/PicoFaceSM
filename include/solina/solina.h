@@ -53,6 +53,7 @@ enum SolinaParam {
     SOLINA_CHORUS_RATE,     /* Control Circuit, Trimmer 48           */
     SOLINA_CHORUS_DEPTH,
     SOLINA_ENSEMBLE_TONE,   /* Rekonstruktionsfilter hinter den BBD */
+    SOLINA_ENSEMBLE_WIDTH,  /* Stereobreite der Ausgangsmischung     */
     SOLINA_PHASER,          /* Phaser an/aus              (Schalter) */
     SOLINA_PHASER_RATE,     /* Durchlaufgeschwindigkeit              */
     SOLINA_PHASER_COLOR,    /* Rueckkopplung                         */

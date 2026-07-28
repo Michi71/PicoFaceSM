@@ -49,6 +49,7 @@ static inline float solinaSemis(float t)
     /* CHORUS_RATE   */ 0.4675f, /* 0.58 Hz */ \
     /* CHORUS_DEPTH  */ 0.9055f, \
     /* ENSEMBLE_TONE */ 0.2000f, \
+    /* ENSEMBLE_WIDTH*/ 0.7000f, \
     /* PHASER        */ 0.0000f, \
     /* PHASER_RATE   */ 0.2500f, \
     /* PHASER_COLOR  */ 0.5000f
@@ -59,7 +60,7 @@ const SolinaProgram solinaPrograms[SOLINA_NPROGRAMS] = {
   { 0.0f,  0.0f,  0.0f,  1.0f,  0.0f,  0.0f,  0.70f, 0.18f, 0.35f, 0.80f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
-{ "Viola + Violin",
+{ "Viola+Violin",
   { 0.0f,  0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.70f, 0.22f, 0.40f, 0.72f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
@@ -67,7 +68,7 @@ const SolinaProgram solinaPrograms[SOLINA_NPROGRAMS] = {
   { 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.75f, 0.25f, 0.45f, 0.62f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
-{ "Cello + Viola",
+{ "Cello+Viola",
   { 0.0f,  1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.80f, 0.28f, 0.45f, 0.75f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
@@ -75,7 +76,7 @@ const SolinaProgram solinaPrograms[SOLINA_NPROGRAMS] = {
   { 0.0f,  0.0f,  0.0f,  0.0f,  1.0f,  1.0f,  0.70f, 0.10f, 0.25f, 0.78f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
-{ "Strings + Brass",
+{ "Strings+Brass",
   { 0.0f,  0.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.70f, 0.20f, 0.40f, 0.68f, 0.50f,
     SOLINA_MOD_DEFAULTS, SOLINA_TONE_DEFAULTS } },
 
@@ -186,6 +187,9 @@ void Solina::applyParameter(int32_t index, float value)
         case SOLINA_ENSEMBLE_TONE:
             ensemble_.setReconScale(powf(2.0f, (value - 0.5f) * 2.0f));
             break;
+        case SOLINA_ENSEMBLE_WIDTH:
+            ensemble_.setWidth(value);
+            break;
 
         /* Phaser (Behringer-Zutat) */
         case SOLINA_PHASER:
@@ -249,9 +253,9 @@ static const char* solinaParamNames[SOLINA_PARAM_COUNT] = {
     "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
     "Sustain",    "Volume",     "Tune",       "Ensemble",
     "Trem Rate",  "Trem Depth", "Chor Rate",  "Chor Depth",
-    "Ens Tone",   "Phaser",     "Phas Rate",  "Phas Color",
-    "Tone LP",    "Tone HP",    "Tone Shelf", "Formant",
-    "Shaper"
+    "Ens Tone",   "Ens Width",  "Phaser",     "Phas Rate",
+    "Phas Color", "Tone LP",    "Tone HP",    "Tone Shelf",
+    "Formant",    "Shaper"
 };
 
 static bool solinaIsSwitch(int32_t i)

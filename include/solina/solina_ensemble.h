@@ -60,6 +60,9 @@ public:
     /* Klangfarbe der Rekonstruktionsfilter, 1.0 = Schaltplanwerte */
     void setReconScale(float s);
 
+    /* Stereobreite: 0 = mono wie das Original, 1 = maximal */
+    void setWidth(float w);
+
     /* Ein Block: Monoeingang, Stereoausgang */
     void process(const float* in, float* outL, float* outR, int count);
 
@@ -105,6 +108,8 @@ private:
      */
     SolinaBiquad reconL1_, reconL2_, reconR1_, reconR2_;
     float reconScale_ = 1.0f;
+
+    float width_ = 0.7f;
 
     float delayCenter_ = 0.0f;   /* in Abtastwerten */
     float delayVar_    = 0.0f;

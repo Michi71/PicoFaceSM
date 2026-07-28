@@ -15,9 +15,10 @@
 #include <stdint.h>
 #include "solina/solina.h"
 
-#define SM_SETTINGS_VERSION 2u
+#define SM_SETTINGS_VERSION 3u
 
-/* Version 2: Parameterliste um den Phaser erweitert (drei Eintraege), damit
+/* Version 3: Ensemble-Stereobreite ergaenzt.
+ * Version 2: Parameterliste um den Phaser erweitert (drei Eintraege), damit
  * verschieben sich alle Indizes ab SOLINA_TONE_LOWPASS. Aeltere Datensaetze
  * werden von veeprom anhand der Version verworfen. */
 struct __attribute__((packed)) SmSettingsV1 {
