@@ -1,12 +1,12 @@
 /*
-  sm_settings.h -- persistierter Frontplattenzustand
+  sm_settings.h -- persisted front panel state
 
-  Nutzlast fuer das veeprom-Anhaengeprotokoll. Gespeichert wird das
-  Werksprogramm, der Empfangskanal und alle Engine-Parameter in Promille
-  (0..1000), damit der Datensatz klein und versionsstabil bleibt.
+  Payload for the veeprom append log. What is stored is the factory program,
+  the receive channel and every engine parameter in per mille (0..1000), which
+  keeps the record small and stable across versions.
 
-  Bei Layoutaenderungen SM_SETTINGS_VERSION erhoehen -- veeprom verwirft
-  Datensaetze mit abweichender Version.
+  Raise SM_SETTINGS_VERSION on any layout change -- veeprom discards records
+  whose version does not match.
 */
 
 #ifndef SM_SETTINGS_H
@@ -17,19 +17,19 @@
 
 #define SM_SETTINGS_VERSION 3u
 
-/* Version 3: Ensemble-Stereobreite ergaenzt.
- * Version 2: Parameterliste um den Phaser erweitert (drei Eintraege), damit
- * verschieben sich alle Indizes ab SOLINA_TONE_LOWPASS. Aeltere Datensaetze
- * werden von veeprom anhand der Version verworfen. */
+/* Version 3: ensemble stereo width added.
+ * Version 2: the parameter list gained the phaser (three entries), which
+ * shifts every index from SOLINA_TONE_LOWPASS onwards. Older records are
+ * discarded by veeprom on the strength of the version number. */
 struct __attribute__((packed)) SmSettingsV1 {
     uint8_t  program;                        /* 0..7                  */
-    uint8_t  midiCh;                         /* 0..15, 16 = Omni      */
-    uint16_t param[SOLINA_PARAM_COUNT];      /* je 0..1000 Promille   */
+    uint8_t  midiCh;                         /* 0..15, 16 = omni      */
+    uint16_t param[SOLINA_PARAM_COUNT];      /* 0..1000 per mille ea. */
 };
 
-/* veeprom traegt 240 Byte Nutzlast je Datensatz. Der Wachhund faengt ab,
- * falls die Parameterliste ueber diese Grenze waechst. */
+/* veeprom carries 240 bytes of payload per record. This guard catches the
+ * case where the parameter list outgrows that limit. */
 static_assert(sizeof(SmSettingsV1) <= 240,
-              "SmSettingsV1 passt nicht mehr in einen veeprom-Datensatz");
+              "SmSettingsV1 no longer fits into a veeprom record");
 
 #endif /* SM_SETTINGS_H */

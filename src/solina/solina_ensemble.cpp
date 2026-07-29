@@ -55,7 +55,7 @@ void SolinaEnsemble::reset()
         memset(line_[l].buf, 0, sizeof(float) * (size_t) line_[l].size);
         line_[l].w = 0;
 
-        /* Die drei Steuersignale stehen 120 Grad auseinander. */
+        /* The three control signals sit 120 degrees apart. */
         ph1_[l] = ((float) l) / (float) SOLINA_ENSEMBLE_LINES;
         ph2_[l] = ((float) l) / (float) SOLINA_ENSEMBLE_LINES;
     }
@@ -115,14 +115,18 @@ void SolinaEnsemble::setReconScale(float s)
 }
 
 /*
- * Kubische Interpolation (Catmull-Rom) statt der linearen aus string-machine
- * (de.fdelayltv(1, ...)).
+ * Cubic interpolation (Catmull-Rom) instead of the linear one used by
+ * string-machine (de.fdelayltv(1, ...)).
  *
- * Bei einer schnell durchgestimmten Verzoegerung wandert der Lesezeiger
- * staendig durch den Bruchteilbereich. Lineare Interpolation wirkt dabei wie
- * ein Tiefpass, dessen Daempfung vom Bruchteil abhaengt -- die Hoehen werden
- * also im Takt der Modulation an- und abgeschwaecht. Genau das erzeugt die
- * unruhige Koernung, die bei dichtem Material und allen Registern auffaellt.
+ * In a quickly swept delay the read pointer travels continuously through the
+ * fractional range. Linear interpolation then acts as a low-pass whose
+ * attenuation depends on the fraction -- so the treble is lifted and dropped
+ * in step with the modulation.
+ *
+ * Note that this was NOT the cause of the restless graininess on dense
+ * material with all registers on; measuring before and after showed no
+ * change. The cubic version is kept because it is the cleaner interpolator,
+ * not because it fixed anything.
  */
 inline float SolinaEnsemble::readDelay(const Line& l, float delaySamples) const
 {
@@ -153,9 +157,9 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
 {
     if (!enabled_)
     {
-        /* Der Ensemble-Schalter des Originals trennt die Modulatorschaltungen
-         * ab; das Signal laeuft trocken durch. Die Leitungen laufen weiter,
-         * damit beim Einschalten kein Sprung entsteht. */
+        /* The ensemble switch of the original disconnects the modulator
+         * circuits; the signal passes through dry. The lines keep running so
+         * that switching back on does not produce a jump. */
         for (int i = 0; i < count; ++i)
         {
             const float x = aa3_.process(aa2_.process(aa1_.process(in[i])));
@@ -176,7 +180,7 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
 
     for (int i = 0; i < count; ++i)
     {
-        /* Anti-Alias-Kette vor den Leitungen */
+        /* Anti-aliasing chain ahead of the lines */
         const float x = aa3_.process(aa2_.process(aa1_.process(in[i])));
 
         float d[SOLINA_ENSEMBLE_LINES];
@@ -185,7 +189,7 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
         {
             Line& ln = line_[l];
 
-            /* Control Circuit: Summe beider Steueroszillatoren */
+            /* Control Circuit: sum of both control oscillators */
             const float mod = SolinaSineTable::lookup(ph1_[l]) * depth1_
                             + SolinaSineTable::lookup(ph2_[l]) * depth2_;
 
@@ -202,21 +206,20 @@ void SolinaEnsemble::process(const float* in, float* outL, float* outR,
             ph2_[l] += inc2_; if (ph2_[l] >= 1.0f) ph2_[l] -= 1.0f;
         }
 
-        /* Ausgangsmatrix der drei Modulatorschaltungen, danach der
-         * Rekonstruktionstiefpass (Low-Pass Filter TR4-5). */
         /*
-         * Ausgangsmischung ueber Mitte und Seite.
+         * Output mix as mid and side, followed by the reconstruction
+         * low-pass (Low-Pass Filter TR4-5).
          *
-         * Das Original ist mono -- "Low output" und "High output" im
-         * Schaltplan sind zwei Pegel, nicht zwei Kanaele. Eine Stereomatrix
-         * ist also ohnehin eine Zutat. string-machine nimmt dafuer
-         * L = d1+d2-d3, R = d1-d2-d3; das erzeugt zwar viel Breite, aber die
-         * Vorzeichen loeschen einen gehaltenen Ton periodisch um bis zu
-         * 10 dB aus -- hoerbar als Pumpen.
+         * The original is mono -- "Low output" and "High output" in the
+         * schematic are two levels, not two channels. Any stereo matrix is
+         * therefore an addition in the first place. string-machine uses
+         * L = d1+d2-d3, R = d1-d2-d3; that gives plenty of width, but the
+         * signs periodically cancel a held note by up to 10 dB -- audible as
+         * pumping.
          *
-         * Hier bildet die Summe der drei Leitungen die Mitte (die pumpt
-         * kaum), die Differenz von Leitung 1 und 3 die Seite. Bei gleicher
-         * Breite halbiert das den Hub.
+         * Here the sum of the three lines forms the mid (which barely pumps)
+         * and the difference of lines 1 and 3 forms the side. At equal width
+         * that halves the excursion.
          */
         const float mid  = (d[0] + d[1] + d[2]) * (2.0f / 3.0f);
         const float side = (d[0] - d[2]) * width_;

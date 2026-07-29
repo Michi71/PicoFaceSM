@@ -1,5 +1,6 @@
 /*
-  solina_phaser.cpp -- Phaser (Zutat des Behringer-Nachbaus, nicht im Original)
+  solina_phaser.cpp -- phaser (an addition of the Behringer remake, not in
+                      the original)
 */
 
 #include "solina/solina_phaser.h"
@@ -20,8 +21,8 @@ void SolinaPhaser::init(float sampleRate)
 void SolinaPhaser::reset()
 {
     memset(ch_, 0, sizeof(ch_));
-    /* Der rechte Kanal laeuft eine Viertelperiode versetzt -- so bewegt sich
-     * die Kerbenlage im Stereobild statt in der Mitte. */
+    /* The right channel runs a quarter period offset -- that way the notch
+     * positions move across the stereo image instead of in the centre. */
     ch_[0].phase = 0.0f;
     ch_[1].phase = 0.25f;
 }
@@ -37,11 +38,11 @@ void SolinaPhaser::setColor(float c)
 {
     if (c < 0.0f) c = 0.0f;
     if (c > 1.0f) c = 1.0f;
-    /* Bis 0,7 -- darueber wird die Rueckkopplung zickig und pfeift. */
+    /* Up to 0.7 -- beyond that the feedback gets touchy and whistles. */
     feedback_ = c * 0.7f;
 }
 
-/* Allpass erster Ordnung, kaskadiert:  y = a1*x + x1 - a1*y1 */
+/* First-order all-pass, cascaded:  y = a1*x + x1 - a1*y1 */
 inline float SolinaPhaser::runStages(Channel& c, float in, float a1) const
 {
     float x = in;
@@ -59,8 +60,8 @@ void SolinaPhaser::process(float* l, float* r, int count)
 {
     if (!enabled_)
     {
-        /* Bei abgeschaltetem Phaser laeuft nur der LFO weiter, damit beim
-         * Einschalten kein Sprung entsteht. */
+        /* With the phaser off only the LFO keeps running, so that switching
+         * it on does not produce a jump. */
         for (int i = 0; i < count; ++i)
             for (int k = 0; k < 2; ++k)
             {
@@ -77,9 +78,9 @@ void SolinaPhaser::process(float* l, float* r, int count)
         Channel& c = ch_[k];
 
         /*
-         * Eckfrequenz einmal je Block aus der LFO-Mitte bestimmen. Der
-         * Durchlauf geht exponentiell von 200 Hz bis 1600 Hz, also drei
-         * Oktaven -- der uebliche Bereich eines Phasers.
+         * Determine the corner frequency once per block, from the midpoint of
+         * the LFO. The sweep runs exponentially from 200 Hz to 1600 Hz, three
+         * octaves -- the usual range of a phaser.
          */
         const float mid = c.phase + inc_ * (float) count * 0.5f;
         const float lfo = SolinaSineTable::lookup(mid - (float) ((int) mid));
@@ -100,7 +101,7 @@ void SolinaPhaser::process(float* l, float* r, int count)
             const float wet = runStages(c, dry + c.fb * feedback_, a1);
             c.fb = wet;
 
-            /* Halb trocken, halb nass -- so entstehen die Kerben ueberhaupt. */
+            /* Half dry, half wet -- that is what creates the notches. */
             p[i] = 0.5f * dry + 0.5f * wet;
 
             c.phase += inc_;

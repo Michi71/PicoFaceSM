@@ -26,9 +26,9 @@ void SolinaKeyboard::reset()
 }
 
 /*
- * Die Sustain-Schaltung laedt einen Kondensator ueber einen Widerstand --
- * exponentieller Anstieg bzw. Abfall. kt entspricht der 90%-Zeitkonstante
- * (string-machine, AHDSREnvelope::updateRates).
+ * The sustain circuit charges a capacitor through a resistor -- exponential
+ * rise and fall. kt corresponds to the 90% time constant (string-machine,
+ * AHDSREnvelope::updateRates).
  */
 static inline float solinaRcCoef(float seconds, float sampleRate)
 {
@@ -67,8 +67,8 @@ int SolinaKeyboard::findActive(int note) const
 }
 
 /*
- * Die am weitesten abgeklungene ausklingende Taste. Gehaltene und ueber das
- * Pedal gehaltene Tasten kommen nicht in Frage.
+ * The releasing key that has decayed furthest. Keys still held, and keys held
+ * by the pedal, are not eligible.
  */
 int SolinaKeyboard::releaseCandidate() const
 {
@@ -114,18 +114,18 @@ void SolinaKeyboard::noteOn(int note)
         else
         {
             /*
-             * Liste voll. Ausklingende Tasten belegen ihren Platz, bis die
-             * Huellkurve abgefallen ist -- bei langem SUSTAIN oder gedruecktem
-             * Pedal kann das den Puffer fuellen, obwohl gar nicht 49 Tasten
-             * gedrueckt sind. In dem Fall wird die am weitesten abgeklungene
-             * ausklingende Taste weiterverwendet.
+             * List full. Releasing keys hold their slot until the envelope
+             * has decayed -- with a long SUSTAIN or the pedal down that can
+             * fill the buffer even though nowhere near 49 keys are pressed.
+             * In that case the releasing key that has decayed furthest is
+             * reused.
              *
-             * Die Huellkurve wird dabei uebernommen und nicht genullt: alle
-             * Tasten klingen mit derselben Zeitkonstante ab, der kleinste Wert
-             * ist also zugleich der aelteste, und der Pegel springt nicht.
+             * Its envelope is carried over rather than zeroed: every key
+             * decays with the same time constant, so the smallest value is
+             * also the oldest one, and the level does not jump.
              *
-             * Sind wirklich alle Tore belegt, bleibt die neue Taste stumm --
-             * das Original hat auch nur 49 Torschaltungen.
+             * If every gate really is taken, the new key stays silent -- the
+             * original has only 49 gate circuits either.
              */
             i = releaseCandidate();
             if (i < 0)
@@ -137,7 +137,7 @@ void SolinaKeyboard::noteOn(int note)
     active_[i].held      = true;
     active_[i].sustained = false;
 
-    /* Low-Tone Selection: tiefster gehaltener Ton im Bassbereich */
+    /* Low-Tone Selection: lowest held note within the bass range */
     const int b = lowestHeldBassNote();
     if (b >= 0)
     {
@@ -265,7 +265,7 @@ void SolinaKeyboard::process(SolinaDivider& divider,
             }
         }
 
-        /* Bass Circuit -- eigene Sustain-Schaltung, monophon */
+        /* Bass Circuit -- its own sustain circuit, monophonic */
         {
             const bool gate = bassActive_;
             bassEnv_ += ((gate ? 1.0f : 0.0f) - bassEnv_) * (gate ? ac : rc);

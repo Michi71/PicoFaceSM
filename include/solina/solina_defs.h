@@ -1,35 +1,33 @@
 /*
   PicoFaceSM -- ARP Solina String Ensemble
 
-  Nachbau nach dem Original-Schaltplan (doc/ARP Solina Schematics.pdf,
-  Sheet 015.0214 "Signal Flow Diagram" und Sheet 015.0212 "Schematic
-  Diagram"), DSP-Modelle angelehnt an string-machine von Jean-Pierre Cimalando
-  (string-machine/, Boost Software License 1.0), das seinerseits auf einem
-  Modell von Peter Whiting beruht.
+  Rebuilt from the original schematic (doc/ARP Solina Schematics.pdf, sheet
+  015.0214 "Signal Flow Diagram" and sheet 015.0212 "Schematic Diagram"). The
+  DSP models follow string-machine by Jean-Pierre Cimalando (Boost Software
+  License 1.0), which in turn builds on a model by Peter Whiting.
 
-  Signalfluss des Originals:
+  Signal flow of the original:
 
     Master Oscillator (SAA1004) + Tuning
-      -> Divider Circuit: 9x SAJ110 Teiler -> Sawtooth Circuits
-      -> Gate Circuit: 10x TDA470 Torschaltungen (pro Taste 4' und 8')
+      -> Divider Circuit: 9x SAJ110 dividers -> Sawtooth Circuits
+      -> Gate Circuit: 10x TDA470 gates (4' and 8' per key)
          + Sustain Circuits
          -> Gate Output Circuit  --> VIOLA (8')    / VIOLIN (4')
          -> Formant Circuit TR5  --> TRUMPET (8')  / HORN (4')
       -> Bass Circuit: Low-Tone Selection -> Clipper -> Bass Sustain
          -> CELLO (8') / CONTRA BASS (16') -> Low-Pass
       -> Register Circuit -> VCA -> Low-Pass
-      -> Modulator Circuit I/II/III (je TCA350Y BBD)
+      -> Modulator Circuit I/II/III (a TCA350Y BBD each)
       -> Output Amplifier -> Correction Filter -> Out
 
-    Control Circuit: Tremolo-Oszillator (schnell) und Chorus-Oszillator
-    (langsam), je ueber Tiefpass, Phase Shift und Inverter auf die drei
-    Modulatorschaltungen C1/C2/C3 verteilt.
+    Control Circuit: a tremolo oscillator (fast) and a chorus oscillator
+    (slow), each routed through a low-pass, a phase shift and an inverter to
+    the three modulator circuits C1/C2/C3.
 
-  Die Solina ist kein Polysynth, sondern eine Orgel mit Frequenzteilern.
-  Alle Toene stammen aus einem Master-Oszillator und sind phasenstarr
-  gekoppelt; es gibt keine Verstimmung zwischen Stimmen. Die Register sind
-  Filterabgriffe, keine Wellenformen. Die gesamte Bewegung im Klang kommt
-  aus dem Ensemble.
+  The Solina is not a polysynth but an organ with frequency dividers. Every
+  note comes from one master oscillator and is phase-locked to the others;
+  there is no detuning between voices. The registers are filter taps, not
+  waveforms. All the movement in the sound comes from the ensemble.
 */
 
 #ifndef SOLINA_DEFS_H
@@ -39,7 +37,7 @@
 #include <stddef.h>
 
 /* ------------------------------------------------------------------------ */
-/* Host-/Target-Umschaltung (analog PicoFaceCP / PicoFaceYC)                 */
+/* Host/target switch (same approach as PicoFaceCP / PicoFaceYC)             */
 /* ------------------------------------------------------------------------ */
 #ifdef SOLINA_HOST_BUILD
 #ifndef PICO_AUDIO_I2S_BUFFERS_PER_CHANNEL
@@ -59,26 +57,26 @@
 #define SOLINA_BLOCK        I2S_BUFFER_WORDS
 
 /* ------------------------------------------------------------------------ */
-/* Klaviatur                                                                 */
+/* Keyboard                                                                  */
 /*                                                                           */
-/* Das Original hat 49 Tasten. Der Schaltplan (Panel A) teilt sie in fuenf   */
-/* Gruppen auf, die im Gate Output Circuit jeweils ein eigenes RC-Glied      */
-/* sehen -- also eine Tastaturteilung der Klangfarbe. Diese Struktur wird    */
-/* hier uebernommen: Filter sitzen pro Gruppe hinter der Summenschiene, nicht*/
-/* pro Ton. Das ist zugleich schaltungstreu und um Groessenordnungen         */
-/* billiger als ein Filtersatz je Stimme.                                    */
+/* The original has 49 keys. The schematic (Panel A) splits them into five   */
+/* groups, each of which sees its own RC network in the Gate Output Circuit  */
+/* -- a keyboard split of the timbre. That structure is kept here: filters   */
+/* sit per group behind the summing bus, not per note. This is both faithful */
+/* to the circuit and orders of magnitude cheaper than one filter set per   */
+/* voice.                                                                   */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_KEY_FIRST    36      /* C2 */
-#define SOLINA_KEY_LAST     84      /* C6 -- 49 Tasten */
+#define SOLINA_KEY_LAST     84      /* C6 -- 49 keys */
 #define SOLINA_NGROUPS      5
 #define SOLINA_KEYS_PER_GROUP 10
 
-/* Bass-Sektion: Low-Tone Selection Circuit deckt die unteren zwei Oktaven ab
- * und arbeitet mit tiefster-Ton-Prioritaet (ein Ton). */
+/* Bass section: the Low-Tone Selection Circuit covers the lower two octaves
+ * and works with lowest-note priority (a single note). */
 #define SOLINA_BASS_LAST    59      /* B3 */
 
-/* Maximal gleichzeitig klingende Tasten (Divide-down kennt keine Stimmen-
- * begrenzung; das hier ist nur die Groesse der Aktivliste). */
+/* Maximum number of keys sounding at once. Divide-down has no voice limit as
+ * such; this is only the size of the active list. */
 #ifndef SOLINA_MAX_ACTIVE_KEYS
 #define SOLINA_MAX_ACTIVE_KEYS 49
 #endif
@@ -86,27 +84,30 @@
 /* ------------------------------------------------------------------------ */
 /* Ensemble (Modulator Circuit I/II/III)                                     */
 /*                                                                           */
-/* Drei BBD-Leitungen TCA350Y. Die Laufzeit liegt bei etwa 5 ms und wird um  */
-/* +/- 1 ms moduliert (Kalibrierung aus string-machine, Delay3Phase.cpp).    */
-/* Der Ausgang wird mit Vorzeichen kombiniert:                               */
-/*     L = d1 + d2 - d3      R = d1 - d2 - d3                                */
+/* Three TCA350Y BBD lines. The delay is around 5 ms and is modulated by     */
+/* +/- 1 ms (calibration taken from string-machine, Delay3Phase.cpp).        */
+/*                                                                           */
+/* The original is mono and sums the three lines with a sign matrix. Here    */
+/* the outputs are combined as mid/side instead, which keeps the mono sum    */
+/* identical while giving the stereo image a width control:                  */
+/*     mid = (d1 + d2 + d3) * 2/3      side = (d1 - d3) * width              */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_ENSEMBLE_LINES     3
 #define SOLINA_ENSEMBLE_DELAY_MS  5.0f
 #define SOLINA_ENSEMBLE_VAR_MS    1.0f
-#define SOLINA_ENSEMBLE_MAX_MS    8.0f   /* Puffergroesse je Leitung */
+#define SOLINA_ENSEMBLE_MAX_MS    8.0f   /* buffer size per line */
 
-/* Control Circuit: Frequenzbereiche der beiden Steueroszillatoren.
- * Aus den Bauteilwerten des Schaltplans:
- *   Tremolo: 2M2 + 1M Trimmer, 68n   -> einige Hz
- *   Chorus : 1M8 + 1M Trimmer, 680n  -> unter 1 Hz
- * Die Grenzen decken sich mit string-machine (LFO3PhaseDual.dsp). */
+/* Control Circuit: frequency ranges of the two control oscillators, derived
+ * from the component values in the schematic:
+ *   Tremolo: 2M2 + 1M trimmer, 68n   -> a few Hz
+ *   Chorus : 1M8 + 1M trimmer, 680n  -> below 1 Hz
+ * The limits agree with string-machine (LFO3PhaseDual.dsp). */
 #define SOLINA_TREMOLO_HZ_MIN   3.0f
 #define SOLINA_TREMOLO_HZ_MAX   9.0f
 #define SOLINA_CHORUS_HZ_MIN    0.3f
 #define SOLINA_CHORUS_HZ_MAX    0.9f
 
-/* Anti-Alias-Kette vor den Verzoegerungsleitungen
+/* Anti-aliasing chain ahead of the delay lines
  * (string-machine, Delay3PhaseDigital.dsp) */
 #define SOLINA_AA_F1  9561.0f   /* midikey2hz(122.3) */
 #define SOLINA_AA_Q1  1.4706f   /* 1/(2-2*0.66)      */
@@ -115,27 +116,27 @@
 #define SOLINA_AA_F3  5751.0f   /* midikey2hz(113.5) */
 #define SOLINA_AA_Q3  1.0870f   /* 1/(2-2*0.54)      */
 
-/* Rekonstruktionsfilter hinter den Verzoegerungsleitungen.
+/* Reconstruction filter behind the delay lines.
  *
- * Modulator Circuit I (doc/StringEnsemble_Schematics-0275.pdf, Seite 4) hat
- * hinter dem BBD ORB 33 ZWEI kaskadierte aktive Tiefpaesse:
- *   Stufe 1  TR5 BC169B, 22K(36)/22K(52)/1K(51), 8n2(37) und 47p(44)
- *   Stufe 2  TR4 BC169B, 22K(48)/1K(45),         2n7(46) und 560p(47)
- * danach erst der Pegeltrimmer 2K2(39) und die Summierung.
+ * Modulator Circuit I (doc/StringEnsemble_Schematics-0275.pdf, page 4) has
+ * TWO cascaded active low-passes behind the BBD ORB 33:
+ *   stage 1  TR5 BC169B, 22K(36)/22K(52)/1K(51), 8n2(37) and 47p(44)
+ *   stage 2  TR4 BC169B, 22K(48)/1K(45),         2n7(46) and 560p(47)
+ * only then come the 2K2(39) level trimmer and the summing stage.
  *
- * Die Eckfrequenzen sind aus den Bauteilwerten geschaetzt (Sallen-Key,
- * f = 1/(2*pi*R*sqrt(C1*C2)) mit R = 22K) -- nicht aus einer durchgerechneten
- * Uebertragungsfunktion. Die Transistorstufen sind im Scan nicht vollstaendig
- * verfolgbar. Ueber den Parameter "Ens Tone" nachstellbar. */
+ * The corner frequencies are estimated from the component values (Sallen-Key,
+ * f = 1/(2*pi*R*sqrt(C1*C2)) with R = 22K) -- not from a worked-out transfer
+ * function. The transistor stages cannot be traced completely in the scan.
+ * Adjustable at runtime through the "Ens Tone" parameter. */
 #define SOLINA_RECON_F1 11653.0f
 #define SOLINA_RECON_F2  5883.0f
 #define SOLINA_RECON_Q   0.7071f
 
 /* ------------------------------------------------------------------------ */
-/* Phaser -- Zutat des Behringer-Nachbaus, nicht im Original                 */
-/*                                                                           */
-/* Behringer-Handbuch, "Modulation Section": Buttons Modulation, phaser /    */
-/* Controls Color, rate. Sechs Allpassstufen, Durchlauf 200 Hz .. 1600 Hz.   */
+/* Phaser -- an addition of the Behringer remake, not in the original       */
+/*                                                                          */
+/* Behringer manual, "Modulation Section": buttons Modulation, phaser /     */
+/* controls Color, rate. Six all-pass stages, sweeping 200 Hz .. 1600 Hz.    */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_PHASER_HZ_MIN   0.05f
 #define SOLINA_PHASER_HZ_MAX   8.0f
@@ -143,20 +144,20 @@
 #define SOLINA_PHASER_F_MAX 1600.0f
 
 /* ------------------------------------------------------------------------ */
-/* Endstufe                                                                  */
+/* Output stage                                                              */
 /*                                                                           */
-/* Schwelle der weichen Begrenzung. Unterhalb -3,1 dBFS ist die Kennlinie    */
-/* linear; die Werksprogramme liegen im normalen Spiel weit darunter und     */
-/* werden gar nicht angefasst. Erst dichte Cluster laufen in die Begrenzung, */
-/* statt an der int16-Grenze hart abgeschnitten zu werden.                   */
+/* Threshold of the soft limiter. Below -3.1 dBFS the curve is exactly       */
+/* linear; in normal playing the factory programs stay far below that and    */
+/* are not touched at all. Only dense clusters run into the limiter, instead */
+/* of being hard-clipped at the int16 boundary.                              */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_CLIP_THRESHOLD 0.70f
 
 /* ------------------------------------------------------------------------ */
-/* Stimmung                                                                  */
+/* Tuning                                                                    */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_A4_HZ        440.0f
-/* Frequenz von MIDI-Note 0 (C-1) */
+/* Frequency of MIDI note 0 (C-1) */
 #define SOLINA_NOTE0_HZ     8.1757989157f
 
 #endif /* SOLINA_DEFS_H */

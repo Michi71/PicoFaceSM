@@ -1,16 +1,16 @@
 /*
-  solina.h -- ARP Solina String Ensemble, Top-Level
+  solina.h -- ARP Solina String Ensemble, top level
 
-  Setzt die Baugruppen des Schaltplans zusammen:
+  Assembles the building blocks of the schematic:
 
       SolinaDivider    Master Oscillator Circuit + Divider Circuit
       SolinaKeyboard   Manual Circuit + Gate Circuit + Sustain Circuits
       SolinaRegisters  Gate Output Circuit + Formant Circuit + Bass Circuit
       SolinaEnsemble   Control Circuit + Modulator Circuit I/II/III
-      SolinaPhaser     Phaser (nicht im Original, vom Behringer-Nachbau)
+      SolinaPhaser     Phaser (not in the original, from the Behringer remake)
 
-  Die oeffentliche Schnittstelle ist an mdaEPiano (PicoFaceCP) angelehnt,
-  damit die RP2350-Anbindung mechanisch bleibt.
+  The public interface follows mdaEPiano (PicoFaceCP) so that wiring it up to
+  the RP2350 stays mechanical.
 */
 
 #ifndef SOLINA_H
@@ -26,44 +26,44 @@
 /* ------------------------------------------------------------------------ */
 /* Parameter                                                                 */
 /*                                                                           */
-/* Die ersten elf entsprechen genau der Frontplatte des Originals            */
-/* (Behringer-Handbuch: "Buttons Contrabass, cello, viola, violin, trumpet,  */
+/* The first eleven match the front panel of the original exactly           */
+/* (Behringer manual: "Buttons Contrabass, cello, viola, violin, trumpet,    */
 /* horn / Controls Volume bass, crescendo, sustain, volume, tune").          */
-/* Danach folgen die Trimmer des Control Circuit und die Abstimmung der      */
-/* Register-Filter, die im Original Bauteilwerte sind.                       */
+/* After those come the Control Circuit trimmers and the tuning of the       */
+/* register filters, which are component values in the original.             */
 /* ------------------------------------------------------------------------ */
 enum SolinaParam {
     /* Tone Section */
-    SOLINA_CONTRABASS = 0,  /* 16', Bass Circuit          (Schalter) */
-    SOLINA_CELLO,           /*  8', Bass Circuit          (Schalter) */
-    SOLINA_VIOLA,           /*  8', Gate Output Circuit   (Schalter) */
-    SOLINA_VIOLIN,          /*  4', Gate Output Circuit   (Schalter) */
-    SOLINA_TRUMPET,         /*  8', Formant Circuit       (Schalter) */
-    SOLINA_HORN,            /*  4', Formant Circuit       (Schalter) */
+    SOLINA_CONTRABASS = 0,  /* 16', Bass Circuit           (switch) */
+    SOLINA_CELLO,           /*  8', Bass Circuit           (switch) */
+    SOLINA_VIOLA,           /*  8', Gate Output Circuit    (switch) */
+    SOLINA_VIOLIN,          /*  4', Gate Output Circuit    (switch) */
+    SOLINA_TRUMPET,         /*  8', Formant Circuit        (switch) */
+    SOLINA_HORN,            /*  4', Formant Circuit        (switch) */
     SOLINA_BASS_VOLUME,     /* Volume Bass                           */
-    SOLINA_CRESCENDO,       /* Anstiegszeit der Sustain-Schaltung    */
-    SOLINA_SUSTAIN,         /* Abfallzeit der Sustain-Schaltung      */
+    SOLINA_CRESCENDO,       /* attack time of the sustain circuit    */
+    SOLINA_SUSTAIN,         /* decay time of the sustain circuit     */
     SOLINA_VOLUME,          /* Output Amplifier                      */
     SOLINA_TUNE,            /* Master Oscillator Tuning              */
 
     /* Modulation Section */
-    SOLINA_ENSEMBLE,        /* Modulation on/off          (Schalter) */
+    SOLINA_ENSEMBLE,        /* Modulation on/off           (switch) */
     SOLINA_TREMOLO_RATE,    /* Control Circuit, Trimmer 71           */
     SOLINA_TREMOLO_DEPTH,
     SOLINA_CHORUS_RATE,     /* Control Circuit, Trimmer 48           */
     SOLINA_CHORUS_DEPTH,
-    SOLINA_ENSEMBLE_TONE,   /* Rekonstruktionsfilter hinter den BBD */
-    SOLINA_ENSEMBLE_WIDTH,  /* Stereobreite der Ausgangsmischung     */
-    SOLINA_PHASER,          /* Phaser an/aus              (Schalter) */
-    SOLINA_PHASER_RATE,     /* Durchlaufgeschwindigkeit              */
-    SOLINA_PHASER_COLOR,    /* Rueckkopplung                         */
+    SOLINA_ENSEMBLE_TONE,   /* reconstruction filters behind the BBD */
+    SOLINA_ENSEMBLE_WIDTH,  /* stereo width of the output mix        */
+    SOLINA_PHASER,          /* Phaser on/off               (switch) */
+    SOLINA_PHASER_RATE,     /* sweep speed                           */
+    SOLINA_PHASER_COLOR,    /* feedback                              */
 
-    /* Klangabstimmung (im Original Bauteilwerte) */
-    SOLINA_TONE_LOWPASS,    /* Gate Output Circuit, Tiefpass         */
-    SOLINA_TONE_HIGHPASS,   /* Gate Output Circuit, Hochpass         */
-    SOLINA_TONE_SHELF,      /* Gate Output Circuit, Hoehenanhebung   */
-    SOLINA_FORMANT,         /* Formant Circuit, Tiefpass             */
-    SOLINA_SHAPER,          /* Begrenzung der Torschaltung           */
+    /* Voicing (component values in the original) */
+    SOLINA_TONE_LOWPASS,    /* Gate Output Circuit, low-pass         */
+    SOLINA_TONE_HIGHPASS,   /* Gate Output Circuit, high-pass        */
+    SOLINA_TONE_SHELF,      /* Gate Output Circuit, treble lift      */
+    SOLINA_FORMANT,         /* Formant Circuit, low-pass             */
+    SOLINA_SHAPER,          /* limiting of the gate circuit          */
 
     SOLINA_PARAM_COUNT
 };
@@ -84,7 +84,7 @@ public:
 
     void setSampleRate(float sampleRate);
 
-    /* Rendert I2S_BUFFER_WORDS Frames; Reihenfolge wie mdaEPiano: (r, l) */
+    /* Renders I2S_BUFFER_WORDS frames; order as in mdaEPiano: (r, l) */
     void process(int16_t* outputs_r, int16_t* outputs_l);
     void processFloat(float* out_l, float* out_r, int frames);
 
@@ -101,14 +101,14 @@ public:
     void    setVolume(uint8_t value);      /* 0..127 */
     uint8_t getVolume() const { return volume_; }
 
-    /* Programme */
+    /* Programs */
     int32_t getProgramCount() const { return SOLINA_NPROGRAMS; }
     int32_t getProgram() const      { return curProgram_; }
     void    setProgram(int32_t program);
     void    getProgramName(char* name) const;
     void    setProgramName(const char* name);
 
-    /* Parameter, jeweils 0..1 */
+    /* Parameters, each 0..1 */
     int32_t getParameterCount() const { return SOLINA_PARAM_COUNT; }
     void    setParameter(int32_t index, float value);
     float   getParameter(int32_t index) const;
@@ -116,7 +116,7 @@ public:
     void    getParameterDisplay(int32_t index, char* text) const;
     void    getParameterLabel(int32_t index, char* text) const;
 
-    /* Transposition eingehender MIDI-Noten */
+    /* Transposition of incoming MIDI notes */
     void setTranspose(int semitones) { transpose_ = semitones; }
 
 private:
@@ -143,7 +143,7 @@ private:
     float   params_[SOLINA_PARAM_COUNT] = {};
     char    programName_[24] = {};
 
-    /* Arbeitspuffer */
+    /* Work buffers */
     float bus8_[SOLINA_NGROUPS][SOLINA_BLOCK];
     float bus4_[SOLINA_NGROUPS][SOLINA_BLOCK];
     float bass8_[SOLINA_BLOCK];

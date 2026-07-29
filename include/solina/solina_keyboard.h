@@ -1,20 +1,20 @@
 /*
   solina_keyboard.h -- Manual Circuit + Gate Circuit + Sustain Circuits
 
-  Original (Schaltplan, Sheet 015.0212):
-      Zehn TDA470 liefern je Taste ein 4'- und ein 8'-Tor. Die "Sustain
-      Circuits" laden bzw. entladen einen Kondensator ueber die Frontplatten-
-      regler CRESCENDO (Anstieg) und SUSTAIN (Abfall); das Ergebnis steuert
-      das Tor. Es gibt also keine Stimmenzuteilung -- jede Taste hat ihr
-      eigenes Tor, alle 49 koennen gleichzeitig klingen.
+  Original (schematic, sheet 015.0212):
+      Ten TDA470 chips provide a 4' and an 8' gate for every key. The
+      "Sustain Circuits" charge and discharge a capacitor through the front
+      panel controls CRESCENDO (attack) and SUSTAIN (decay); the result
+      drives the gate. There is therefore no voice allocation -- every key
+      has its own gate and all 49 can sound at once.
 
-      Die Toraussgaenge laufen auf fuenf Sammelschienen, je eine pro
-      Tastaturgruppe (Panel A). Jede Gruppe sieht im Gate Output Circuit ihr
-      eigenes RC-Glied -- eine Tastaturteilung der Klangfarbe. Deshalb wird
-      hier pro Gruppe und Fusslage summiert, nicht pro Ton.
+      The gate outputs run onto five busses, one per keyboard group
+      (Panel A). Each group sees its own RC network in the Gate Output
+      Circuit -- a keyboard split of the timbre. That is why the summing here
+      happens per group and footage rather than per note.
 
-      Der Bass Circuit hat eine eigene "Low-Tone Selection" mit
-      tiefster-Ton-Prioritaet und eine eigene Sustain-Schaltung.
+      The Bass Circuit has its own "Low-Tone Selection" with lowest-note
+      priority and its own sustain circuit.
 */
 
 #ifndef SOLINA_KEYBOARD_H
@@ -34,14 +34,14 @@ public:
     void allNotesOff();
     void setSustainPedal(bool on);
 
-    /* Frontplatte: CRESCENDO = Anstiegszeit, SUSTAIN = Abfallzeit (Sekunden) */
+    /* Front panel: CRESCENDO = attack time, SUSTAIN = decay time (seconds) */
     void setCrescendo(float seconds);
     void setSustain(float seconds);
 
     /*
-     * Rendert einen Block.
-     *   bus8/bus4   [Gruppe][Sample] -- Summenschienen des Manuals
-     *   bass8/bass16              -- Bass Circuit, monophon
+     * Renders one block.
+     *   bus8/bus4     [group][sample] -- the manual's summing busses
+     *   bass8/bass16                  -- Bass Circuit, monophonic
      */
     void process(SolinaDivider& divider,
                  float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
@@ -59,7 +59,7 @@ public:
         return g;
     }
 
-    /* Mittenfrequenz einer Tastaturgruppe (fuer die Filterabstimmung) */
+    /* Centre frequency of a keyboard group (used to tune the filters) */
     static float groupCenterHz(int g);
 
 private:
@@ -86,12 +86,12 @@ private:
     Key    active_[SOLINA_MAX_ACTIVE_KEYS] = {};
     int    activeCount_ = 0;
 
-    /* Bass Circuit: ein Ton mit tiefster-Ton-Prioritaet */
+    /* Bass Circuit: a single note with lowest-note priority */
     bool   bassActive_ = false;
     int    bassNote_ = -1;
     float  bassEnv_ = 0.0f;
 
-    /* Tastenzustand fuer die Tiefsten-Ton-Auswahl */
+    /* Key state, needed for the lowest-note selection */
     bool   keyHeld_[128] = {};
 };
 

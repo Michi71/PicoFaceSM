@@ -1,21 +1,21 @@
 /*
   solina_divider.h -- Master Oscillator Circuit + Divider Circuit
 
-  Original (Schaltplan, Sheet 015.0212):
-      Master Oscillator TR2/SAA1004 mit Tuning-Trimmer erzeugt die oberste
-      Oktave (12 Halbtoene). Neun SAJ110 halbieren daraus die tieferen
-      Oktaven. Die nachgeschalteten "Sawtooth Circuits" formen aus den
-      Rechtecken Saegezaehne.
+  Original (schematic, sheet 015.0212):
+      Master Oscillator TR2/SAA1004 with a tuning trimmer generates the top
+      octave (12 semitones). Nine SAJ110 chips halve that down into the lower
+      octaves. The "Sawtooth Circuits" behind them turn the square waves into
+      sawtooths.
 
-  Modell:
-      Zwoelf Phasenakkumulatoren, je einer pro Tonklasse, laufen mit der
-      Frequenz der *untersten* Oktave. Jede hoehere Oktave entsteht durch
-      Linksschieben des Akkumulators -- das ist bitgenau dasselbe wie eine
-      Teilerkette, nur rueckwaerts betrachtet, und garantiert die
-      Phasenstarrheit aller Oktaven derselben Tonklasse.
+  Model:
+      Twelve phase accumulators, one per pitch class, run at the frequency of
+      the *lowest* octave. Every higher octave is produced by left-shifting
+      the accumulator -- bit for bit the same thing as a divider chain, only
+      viewed backwards, and it guarantees that all octaves of one pitch class
+      stay phase-locked.
 
-      Genau daraus lebt der Solina-Klang: zwischen zwei gegriffenen Toenen
-      gibt es keinerlei Schwebung. Alle Bewegung kommt aus dem Ensemble.
+      This is exactly what the Solina sound lives on: there is no beating
+      whatsoever between two held notes. All movement comes from the ensemble.
 */
 
 #ifndef SOLINA_DIVIDER_H
@@ -36,13 +36,13 @@ public:
 
     void reset()
     {
-        /* Alle Teiler starten phasengleich -- wie nach dem Einschalten,
-         * wenn die Teilerkette aus einem Zaehlerreset laeuft. */
+        /* All dividers start in phase -- as they do after power-up, when the
+         * divider chain runs out of a counter reset. */
         for (int pc = 0; pc < 12; ++pc)
             acc_[pc] = 0;
     }
 
-    /* Master Oscillator Tuning, in Halbtoenen */
+    /* Master oscillator tuning, in semitones */
     void setTune(float semitones)
     {
         tune_ = semitones;
@@ -50,7 +50,7 @@ public:
 
         for (int pc = 0; pc < 12; ++pc)
         {
-            /* Frequenz der MIDI-Note pc (unterste Oktave, C-1..B-1) */
+            /* Frequency of MIDI note pc (lowest octave, C-1..B-1) */
             const float f = SOLINA_NOTE0_HZ * powf(2.0f, ((float) pc) / 12.0f)
                             * ratio;
             stepLow_[pc] = f / samplerate_;
@@ -60,14 +60,14 @@ public:
 
     float tune() const { return tune_; }
 
-    /* Ein Abtastschritt der gesamten Teilerkette */
+    /* One sample step of the whole divider chain */
     inline void tick()
     {
         for (int pc = 0; pc < 12; ++pc)
             acc_[pc] += inc_[pc];
     }
 
-    /* Phase 0..1 der MIDI-Note */
+    /* Phase 0..1 of the given MIDI note */
     inline float phase(int note) const
     {
         const int pc  = note - 12 * (note / 12);
@@ -75,7 +75,7 @@ public:
         return (float) (acc_[pc] << oct) * (1.0f / 4294967296.0f);
     }
 
-    /* Schrittweite (Perioden pro Abtastwert) der MIDI-Note */
+    /* Step size (periods per sample) of the given MIDI note */
     inline float step(int note) const
     {
         const int pc  = note - 12 * (note / 12);

@@ -1,5 +1,5 @@
 /*
-  solina.cpp -- ARP Solina String Ensemble, Top-Level
+  solina.cpp -- ARP Solina String Ensemble, top level
 */
 
 #include "solina/solina.h"
@@ -9,31 +9,31 @@
 #include <stdio.h>
 
 /* ------------------------------------------------------------------------ */
-/* Wertebereiche der Parameter                                               */
+/* Parameter ranges                                                          */
 /* ------------------------------------------------------------------------ */
 static inline float solinaLerp(float a, float b, float t)
 {
     return a + (b - a) * t;
 }
 
-/* Zeiten exponentiell, damit der Regelweg sich sinnvoll anfuehlt */
+/* Times scale exponentially, so the control travel feels sensible */
 static inline float solinaTime(float t, float lo, float hi)
 {
     return lo * powf(hi / lo, t);
 }
 
-/* Filterabstimmung: -20 .. +60 Halbtoene (Bereich aus string-machine) */
+/* Filter tuning: -20 .. +60 semitones (range taken from string-machine) */
 static inline float solinaSemis(float t)
 {
     return solinaLerp(-20.0f, 60.0f, t);
 }
 
 /* ------------------------------------------------------------------------ */
-/* Werksprogramme                                                            */
+/* Factory programs                                                          */
 /*                                                                           */
-/* Registrierungen nach den ueblichen Solina-Kombinationen. Die              */
-/* Klangabstimmung ist in allen Programmen gleich; sie entspricht im         */
-/* Original festen Bauteilwerten und ist nur zum Nachjustieren offen.        */
+/* Registrations following the usual Solina combinations. The voicing is the  */
+/* same in every program; in the original it is fixed component values and is */
+/* exposed here only for trimming.                                           */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_TONE_DEFAULTS \
     /* TONE_LOWPASS */ 0.3150f, \
@@ -90,13 +90,13 @@ const SolinaProgram solinaPrograms[SOLINA_NPROGRAMS] = {
 };
 
 /* ------------------------------------------------------------------------ */
-/* Ausgangspegel                                                             */
+/* Output level                                                              */
 /*                                                                           */
-/* Die Summenschienen tragen bandbegrenzte Saegezaehne mit +/-1 je Taste.    */
-/* Der Faktor ist so gewaehlt, dass normales Spiel mit Abstand unter der     */
-/* Begrenzungsschwelle bleibt; dichte Cluster faengt danach die weiche       */
-/* Begrenzung der Endstufe ab (solinaSoftClip). Im Original macht das der    */
-/* Output Amplifier an seinen Versorgungsschienen.                           */
+/* The summing busses carry band-limited sawtooths of +/-1 per key. The       */
+/* factor is chosen so that normal playing stays comfortably below the        */
+/* limiting threshold; dense clusters are then caught by the soft limiter of  */
+/* the output stage (solinaSoftClip). In the original the Output Amplifier    */
+/* does that at its supply rails.                                            */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_OUTPUT_SCALE 0.115f
 
@@ -149,7 +149,7 @@ void Solina::applyParameter(int32_t index, float value)
 
         case SOLINA_BASS_VOLUME: registers_.setBassVolume(value);        break;
 
-        /* Sustain Circuits: Anstieg 5 ms .. 1,5 s, Abfall 20 ms .. 4 s */
+        /* Sustain Circuits: attack 5 ms .. 1.5 s, decay 20 ms .. 4 s */
         case SOLINA_CRESCENDO:
             keyboard_.setCrescendo(solinaTime(value, 0.005f, 1.5f));
             break;
@@ -158,9 +158,9 @@ void Solina::applyParameter(int32_t index, float value)
             break;
 
         case SOLINA_VOLUME:
-            break;   /* wird im Renderer ausgewertet */
+            break;   /* evaluated in the renderer */
 
-        /* Master Oscillator Tuning: +/- 1 Halbton um die Mitte */
+        /* Master oscillator tuning: +/- 1 semitone around centre */
         case SOLINA_TUNE:
             divider_.setTune((value * 2.0f - 1.0f) + bend_);
             break;
@@ -182,8 +182,8 @@ void Solina::applyParameter(int32_t index, float value)
         case SOLINA_CHORUS_DEPTH:
             ensemble_.setChorusDepth(value);
             break;
-        /* 0.5 = Schaltplanwerte (11,7 kHz / 5,9 kHz), 0 = eine Oktave tiefer,
-         * 1 = eine Oktave hoeher */
+        /* 0.5 = schematic values (11.7 kHz / 5.9 kHz), 0 = an octave lower,
+         * 1 = an octave higher */
         case SOLINA_ENSEMBLE_TONE:
             ensemble_.setReconScale(powf(2.0f, (value - 0.5f) * 2.0f));
             break;
@@ -191,12 +191,12 @@ void Solina::applyParameter(int32_t index, float value)
             ensemble_.setWidth(value);
             break;
 
-        /* Phaser (Behringer-Zutat) */
+        /* Phaser (a Behringer addition) */
         case SOLINA_PHASER:
             phaser_.setEnabled(value != 0.0f);
             break;
         case SOLINA_PHASER_RATE:
-            /* exponentiell, damit der Regelweg gleichmaessig wirkt */
+            /* exponential, so the control travel feels even */
             phaser_.setRate(solinaTime(value, SOLINA_PHASER_HZ_MIN,
                                               SOLINA_PHASER_HZ_MAX));
             break;
@@ -329,7 +329,7 @@ void Solina::getParameterDisplay(int32_t index, char* text) const
 }
 
 /* ------------------------------------------------------------------------ */
-/* Programme                                                                 */
+/* Programs                                                                  */
 /* ------------------------------------------------------------------------ */
 void Solina::setProgram(int32_t program)
 {
@@ -367,8 +367,8 @@ void Solina::noteOn(int32_t note, int32_t velocity)
     while (n > 127) n -= 12;
     while (n < 0)   n += 12;
 
-    /* Die Solina ist anschlagdynamisch nicht empfindlich -- die Torschaltung
-     * kennt nur auf und zu. */
+    /* The Solina is not velocity sensitive -- the gate circuit knows only
+     * open and closed. */
     keyboard_.noteOn(n);
 }
 
@@ -382,15 +382,15 @@ void Solina::noteOff(int32_t note)
 }
 
 /*
- * Pitchbend wirkt im Original auf den Master Oscillator, also auf alle Toene
- * gemeinsam -- hier genauso, als Verstimmung der Teilerkette.
+ * In the original, pitch bend acts on the master oscillator and therefore on
+ * every note at once -- the same here, as a detuning of the divider chain.
  */
 void Solina::setPitchBend(int32_t bend14)
 {
     if (bend14 < 0)     bend14 = 0;
     if (bend14 > 16383) bend14 = 16383;
 
-    bend_ = (((float) bend14 - 8192.0f) / 8192.0f) * 2.0f;   /* +/- 2 Halbtoene */
+    bend_ = (((float) bend14 - 8192.0f) / 8192.0f) * 2.0f;   /* +/- 2 semitones */
     divider_.setTune((params_[SOLINA_TUNE] * 2.0f - 1.0f) + bend_);
 }
 
@@ -449,8 +449,8 @@ void Solina::renderBlock(int frames)
 
     ensemble_.process(mono_, left_, right_, frames);
 
-    /* Phaser als Einschleifpunkt hinter dem Ensemble -- beim Behringer sind
-     * dafuer eigene Buchsen "Phaser in/out" nach aussen gefuehrt. */
+    /* Phaser as an insert behind the ensemble -- on the Behringer this is
+     * brought out on its own "Phaser in/out" jacks. */
 #if !SM_NO_PHASER
     phaser_.process(left_, right_, frames);
 #endif

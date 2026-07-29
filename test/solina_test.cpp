@@ -1,23 +1,23 @@
 /*
-  solina_test.cpp  --  macOS-Host-Test fuer die Solina-Engine (PicoFaceSM)
+  solina_test.cpp  --  macOS host test for the Solina engine (PicoFaceSM)
 
-  Spielt die (unveraenderte) Pico-Solina-Engine aus include/solina + src/solina
-  auf dem Mac ueber CoreAudio und steuert sie per MIDI (PortMidi virtueller
-  Input "solina").
+  Plays the (unmodified) Pico Solina engine from include/solina + src/solina
+  on the Mac through CoreAudio and drives it over MIDI (PortMidi virtual
+  input "solina").
 
-  Steuerung:
-    + / -   Programm (Preset) wechseln
-    1..8    Programm direkt waehlen
-    Register (Tone Section):
+  Controls:
+    + / -   change program (preset)
+    1..8    select a program directly
+    Registers (Tone Section):
       y     Contrabass 16'      x   Cello 8'
       c     Viola 8'            v   Violin 4'
       b     Trumpet 8'          n   Horn 4'
-    e       Ensemble (Modulation) an/aus
-    s       Sustain-Pedal (CC64) an/aus
-    d       Demo-Akkord spielen / loslassen
-    a       Arpeggio ueber die Klaviatur
-    p       Parameterliste ausgeben
-    q       Quit
+    e       Ensemble (modulation) on/off
+    s       sustain pedal (CC64) on/off
+    d       play / release a demo chord
+    a       arpeggio across the keyboard
+    p       print the parameter list
+    q       quit
 
   Build:  ./test/build_solina.sh
 */
@@ -39,7 +39,7 @@ static const uint32_t HOST_SR = 44100;
 static Solina* synth = nullptr;
 
 // ---------------------------------------------------------------------------
-// Audio (CoreAudio) -- Ringpuffer: Engine-Bloecke verlustfrei gefuellt
+// Audio (CoreAudio) -- ring buffer: engine blocks consumed without loss
 // ---------------------------------------------------------------------------
 static AudioUnit audioUnit;
 static int16_t ringL[I2S_BUFFER_WORDS], ringR[I2S_BUFFER_WORDS];
@@ -127,17 +127,17 @@ static const char* onoff(int32_t p) {
 }
 static void printStatus() {
     char pname[24] = {0}; synth->getProgramName(pname);
-    std::printf("Programm %d/%d: %-16s  [CB %s Cel %s Vla %s Vln %s Tpt %s Hrn %s]  Ensemble %s\n",
+    std::printf("Program %d/%d: %-16s  [CB %s Cel %s Vla %s Vln %s Tpt %s Hrn %s]  Ensemble %s\n",
                 synth->getProgram() + 1, synth->getProgramCount(), pname,
                 onoff(SOLINA_CONTRABASS), onoff(SOLINA_CELLO),
                 onoff(SOLINA_VIOLA), onoff(SOLINA_VIOLIN),
                 onoff(SOLINA_TRUMPET), onoff(SOLINA_HORN),
-                synth->getParameter(SOLINA_ENSEMBLE) != 0.0f ? "an" : "aus");
+                synth->getParameter(SOLINA_ENSEMBLE) != 0.0f ? "on" : "off");
 }
 
 static void printParams() {
     char n[24], d[16], l[16];
-    std::cout << "--- Parameter ---------------------------------------\n";
+    std::cout << "--- Parameters --------------------------------------\n";
     for (int32_t i = 0; i < synth->getParameterCount(); i++) {
         synth->getParameterName(i, n);
         synth->getParameterDisplay(i, d);
@@ -156,10 +156,10 @@ static const int chord[4] = { 48, 55, 64, 67 };
 static void toggleChord() {
     for (int k : chord) chordDown ? synth->noteOff(k) : synth->noteOn(k, 100);
     chordDown = !chordDown;
-    std::cout << (chordDown ? "Akkord an\n" : "Akkord aus\n");
+    std::cout << (chordDown ? "Chord on\n" : "Chord off\n");
 }
 
-// Arpeggio ueber den Tastaturumfang -- zeigt die Tastaturteilung der Klangfarbe
+// Arpeggio across the keyboard range -- shows the keyboard split of the timbre
 static void arpeggio() {
     std::cout << "Arpeggio C2..C6\n";
     for (int n = 36; n <= 84; n += 2) {
@@ -176,16 +176,16 @@ int main() {
     synth->setProgram(2);
 
     if (!initAudio()) { fprintf(stderr, "Audio init failed.\n"); return 1; }
-    if (!initMIDI())  { fprintf(stderr, "MIDI init failed (weiter ohne MIDI).\n"); }
+    if (!initMIDI())  { fprintf(stderr, "MIDI init failed (continuing without MIDI).\n"); }
     AudioOutputUnitStart(audioUnit);
 
-    std::cout << "ARP Solina String Ensemble -- Host-Test  (SR=" << HOST_SR
-              << ", Block=" << I2S_BUFFER_WORDS << ", Klaviatur C2..C6)\n";
-    std::cout << "MIDI: virtuellen Port \"" << VIRT_NAME << "\" ansteuern.\n";
+    std::cout << "ARP Solina String Ensemble -- host test  (SR=" << HOST_SR
+              << ", block=" << I2S_BUFFER_WORDS << ", keyboard C2..C6)\n";
+    std::cout << "MIDI: send to the virtual port \"" << VIRT_NAME << "\".\n";
     printStatus();
     std::thread inputThread(inputThreadFunc);
-    printf("+/- Programm | 1..8 direkt | y/x Bass | c/v Streicher | b/n Blaeser\n"
-           "e Ensemble | s Sustain | d Akkord | a Arpeggio | p Parameter | q Quit\n");
+    printf("+/- program | 1..8 direct | y/x bass | c/v strings | b/n brass\n"
+           "e ensemble | s sustain | d chord | a arpeggio | p params | q quit\n");
 
     bool sustainToggle = false, quit = false;
     while (!quit) {
@@ -209,7 +209,7 @@ int main() {
             case 'p': printParams(); break;
             case 's': sustainToggle=!sustainToggle;
                       synth->processMidiController(0x40, sustainToggle?127:0);
-                      std::cout << "Sustain " << (sustainToggle?"AN":"AUS") << std::endl; break;
+                      std::cout << "Sustain " << (sustainToggle?"ON":"OFF") << std::endl; break;
             case 'q': quit = true; break;
             default: break;
         }

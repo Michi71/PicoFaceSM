@@ -2,34 +2,34 @@
   solina_registers.h -- Gate Output Circuit, Formant Circuit, Bass Circuit,
                         Register Circuit
 
-  Original (Schaltplan, Sheet 015.0214 und 015.0212):
+  Original (schematic, sheets 015.0214 and 015.0212):
 
-      Die Torausgaenge laufen auf zwei Wege:
+      The gate outputs take two paths:
 
         Gate Output Circuit   -> VIOLA (8')   / VIOLIN (4')
-          Je Tastaturgruppe ein eigenes RC-Glied (10K Reihe, 10K nach Masse,
-          C = 5n6 / 10n / 22n / 47n / ...), danach TR4 und ein
-          Formungsnetzwerk 47n-22K-1n-18K.
+          One RC network per keyboard group (10K in series, 10K to ground,
+          C = 5n6 / 10n / 22n / 47n / ...), then TR4 and a shaping network
+          47n-22K-1n-18K.
 
         Formant Circuit TR5   -> TRUMPET (8') / HORN (4')
-          Netzwerk aus 120n/47n/100K/220R um TR5, deutlich tiefer abgestimmt
-          und ohne die Hoehenanhebung -- daher der hohle, blaeserartige Ton.
+          A network of 120n/47n/100K/220R around TR5, tuned distinctly lower
+          and without the treble lift -- hence the hollow, brass-like tone.
 
         Bass Circuit          -> CELLO (8')   / CONTRA BASS (16')
-          Low-Tone Selection -> Clipper (709) -> Bass Sustain Voltage Circuit
-          -> Tiefpass TR1.
+          Low-Tone Selection -> clipper (709) -> Bass Sustain Voltage Circuit
+          -> low-pass TR1.
 
-  Modell:
-      Die Filter sitzen wie im Original *hinter* der Summenschiene und nicht
-      pro Ton -- aber pro Tastaturgruppe, weil das Original je Gruppe ein
-      eigenes RC-Glied hat. Das ergibt die Tastaturteilung der Klangfarbe
-      bei einem Bruchteil der Rechenzeit eines Filtersatzes je Stimme.
+  Model:
+      As in the original the filters sit *behind* the summing bus rather than
+      per note -- but per keyboard group, because the original has its own RC
+      network for each group. That reproduces the keyboard split of the
+      timbre at a fraction of the CPU cost of one filter set per voice.
 
-      Die Eckfrequenzen sind relativ zur Mittenfrequenz der jeweiligen
-      Gruppe angesetzt. Die Verhaeltnisse stammen aus string-machine
-      (StringFilters, dort tongenau statt gruppenweise); sie sind dort gegen
-      das Original abgehoert worden. Die Werte sind ueber setTone() /
-      setFormant() nachjustierbar.
+      The corner frequencies are set relative to the centre frequency of the
+      respective group. The ratios come from string-machine (StringFilters,
+      which works per note rather than per group); they were tuned against
+      the original there. The values can be trimmed through setTone() and
+      setFormant().
 */
 
 #ifndef SOLINA_REGISTERS_H
@@ -44,7 +44,7 @@ public:
     void init(float sampleRate);
     void reset();
 
-    /* Registerschalter der Frontplatte */
+    /* Front panel register switches */
     void setViola(bool on)      { viola_ = on; }
     void setViolin(bool on)     { violin_ = on; }
     void setTrumpet(bool on)    { trumpet_ = on; }
@@ -55,8 +55,8 @@ public:
     void setBassVolume(float v) { bassVolume_ = v; }
 
     /*
-     * Abstimmung, jeweils in Halbtoenen relativ zur Gruppenmitte.
-     * Vorgaben aus string-machine/plugins/string-machine/StringMachineShared.cpp
+     * Tuning, each given in semitones relative to the group centre.
+     * Defaults from string-machine, plugins/string-machine/StringMachineShared.cpp
      */
     void setTone(float lowpassSemis, float highpassSemis,
                  float shelfSemis, float shelfDb);
@@ -64,10 +64,10 @@ public:
     void setShaper(float amount);
 
     /*
-     * Ein Block.
-     *   bus8/bus4  Summenschienen je Tastaturgruppe
+     * One block.
+     *   bus8/bus4  summing busses, one per keyboard group
      *   bass8/16   Bass Circuit
-     *   out        Register Circuit, Monosumme
+     *   out        Register Circuit, mono sum
      */
     void process(const float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
                  const float bus4[SOLINA_NGROUPS][SOLINA_BLOCK],
@@ -78,11 +78,11 @@ private:
     void updateCutoffs();
 
     struct GroupFilters {
-        /* Gate Output Circuit: Tiefpass, Hochpass, Hoehenanhebung */
+        /* Gate Output Circuit: low-pass, high-pass, treble lift */
         SolinaLPF1   stringLp8, stringLp4;
         SolinaHPF1   stringHp8, stringHp4;
         SolinaBiquad stringShelf8, stringShelf4;
-        /* Formant Circuit: nur Tiefpass */
+        /* Formant Circuit: low-pass only */
         SolinaLPF1   brassLp8, brassLp4;
     };
 
@@ -101,17 +101,17 @@ private:
     float bassVolume_ = 0.8f;
 
     /*
-     * Pegelabgleich der Register.
+     * Level matching between the registers.
      *
-     * Im Original erledigen das die Widerstaende am Registerschalter
-     * (100K an H8/H12/H9 im Formant Circuit, das Netzwerk am Bass Circuit).
-     * Ohne den Abgleich liegt der Formant-Zweig rund 14 dB und der Bass-Zweig
-     * rund 8 dB ueber dem Streicher-Zweig, weil dort kein Hochpass sitzt.
-     * Gemessen an einem Vierklang, siehe README.
+     * In the original the resistors at the register switch take care of this
+     * (100K at H8/H12/H9 in the Formant Circuit, the network at the Bass
+     * Circuit). Without the correction the formant branch sits about 14 dB
+     * and the bass branch about 8 dB above the string branch, because
+     * neither has a high-pass. Measured on a four-note chord, see README.
      */
     static constexpr float kGainString = 1.00f;
-    static constexpr float kGainBrass  = 0.19f;   /* -14,4 dB */
-    static constexpr float kGainBass   = 0.38f;   /*  -8,4 dB */
+    static constexpr float kGainBrass  = 0.19f;   /* -14.4 dB */
+    static constexpr float kGainBass   = 0.38f;   /*  -8.4 dB */
 
     float toneLpSemis_ = 5.2f;
     float toneHpSemis_ = 12.2f;

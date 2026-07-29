@@ -102,7 +102,7 @@ void SolinaRegisters::updateCutoffs()
         grp_[g].brassLp4.setCutoff(limit(f4 * fm));
     }
 
-    /* Bass Circuit: Tiefpass hinter dem Clipper, fest abgestimmt */
+    /* Bass Circuit: low-pass behind the clipper, fixed tuning */
     bassLp_.setCutoff(limit(320.0f));
 }
 
@@ -124,8 +124,8 @@ void SolinaRegisters::process(const float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
 
         if (needString)
         {
-            /* Gate Output Circuit: Tiefpass, Hochpass, Hoehenanhebung,
-             * danach die einseitige Begrenzung der Torschaltung. */
+            /* Gate Output Circuit: low-pass, high-pass, treble lift, then
+             * the one-sided limiting of the gate circuit. */
             if (viola_)
                 for (int i = 0; i < count; ++i)
                 {
@@ -146,7 +146,7 @@ void SolinaRegisters::process(const float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
 
         if (needBrass)
         {
-            /* Formant Circuit: tiefer abgestimmt, ohne Hoehenanhebung */
+            /* Formant Circuit: tuned lower, without the treble lift */
             if (trumpet_)
                 for (int i = 0; i < count; ++i)
                     out[i] += f.brassLp8.process(in8[i]) * kGainBrass;
@@ -156,7 +156,7 @@ void SolinaRegisters::process(const float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
         }
     }
 
-    /* Bass Circuit: Clipper (709) und Tiefpass TR1 */
+    /* Bass Circuit: clipper (709) and low-pass TR1 */
     if (cello_ || contrabass_)
     {
         const float bv = bassVolume_ * kGainBass;
@@ -166,7 +166,7 @@ void SolinaRegisters::process(const float bus8[SOLINA_NGROUPS][SOLINA_BLOCK],
             if (contrabass_) x += bass16[i];
             if (cello_)      x += bass8[i];
 
-            /* Clipper: harte Begrenzung wie im Original */
+            /* Clipper: hard limiting as in the original */
             x *= 2.0f;
             if (x >  1.0f) x =  1.0f;
             if (x < -1.0f) x = -1.0f;

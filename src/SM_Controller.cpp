@@ -1,5 +1,5 @@
 /*
-  SM_Controller.cpp -- Bedienlogik fuer PicoFaceSM
+  SM_Controller.cpp -- front panel logic for PicoFaceSM
 */
 
 #include "SM_Controller.h"
@@ -8,11 +8,11 @@
 #include <string.h>
 
 /* ------------------------------------------------------------------------ */
-/* Seitenaufteilung                                                          */
+/* Page layout                                                               */
 /*                                                                           */
-/* Erst die Frontplatte des Originals (Register, Huellkurve, Ensemble),      */
-/* danach die Feinabstimmung, die im Geraet Bauteilwerte bzw. Trimmer sind.  */
-/* Umsortieren heisst: eine Zeile verschieben.                               */
+/* First the front panel of the original (registers, envelope, ensemble),     */
+/* then the fine tuning, which in the instrument is component values and      */
+/* trimmers. Reordering means moving a line.                                  */
 /* ------------------------------------------------------------------------ */
 struct SmPage {
     const char* name;
@@ -39,12 +39,13 @@ static const SmPage kPages[] = {
 
 static const int kPageCount = (int) (sizeof(kPages) / sizeof(kPages[0]));
 
-/* Anzeigenamen der Engine-Parameter; SM_UI_* haengen hinten an.
+/* Display names of the engine parameters; the SM_UI_* entries follow at the
+ * end.
  *
- * Ein leerer Name heisst: der Wert beschreibt sich selbst und wird ohne
- * Beschriftung angezeigt. Beim Programm ist das so -- die Kopfzeile sagt
- * bereits PRESET, und "Program 6 Strings+Brass" waere mit 25 Zeichen
- * doppelt so lang wie die Zeile (Font 8x13B, 15 Zeichen ab x=4). */
+ * An empty name means the value describes itself and is shown without a
+ * label. That is the case for the program -- the header already says PRESET,
+ * and "Program 6 Strings+Brass" would be 25 characters, twice the width of
+ * the line (font 8x13B, 15 characters from x=4). */
 static const char* kNames[SM_UI_COUNT] = {
     "Contrabass", "Cello",      "Viola",      "Violin",
     "Trumpet",    "Horn",       "Bass Vol",   "Crescendo",
@@ -55,8 +56,8 @@ static const char* kNames[SM_UI_COUNT] = {
     "Formant",    "Shaper",     "",           "MIDI Ch"
 };
 
-/* Schalterparameter springen zwischen 0 und 1, alles andere laeuft in
- * Schritten von 1 % durch (siehe adjust()). */
+/* Switch parameters toggle between 0 and 1, everything else moves in steps
+ * of 1 % (see adjust()). */
 static bool isSwitch(int id)
 {
     return id <= SOLINA_HORN || id == SOLINA_ENSEMBLE || id == SOLINA_PHASER;
@@ -66,7 +67,7 @@ static bool isSwitch(int id)
 SM_Controller::SM_Controller(SM_Midi& midi)
     : midi_(midi)
 {
-    /* Schattenkopien aus dem Startprogramm ziehen */
+    /* Take the shadow copies from the startup program */
     syncFromProgram(program_);
 }
 
@@ -111,7 +112,7 @@ bool SM_Controller::homePage()
 
 void SM_Controller::sendParam(int id, float v)
 {
-    /* Promille ueber den IPC-Ring; die Audioseite teilt wieder durch 1000. */
+    /* Per mille across the IPC ring; the audio side divides by 1000 again. */
     uint16_t q = (uint16_t) (v * 1000.0f + 0.5f);
     if (q > 1000) q = 1000;
     ipc_send_param((uint8_t) id, q);
@@ -149,11 +150,11 @@ void SM_Controller::adjust(int slot, int delta)
     else
     {
         /*
-         * In ganzen Prozent rechnen statt einen Betrag zu addieren. Die
-         * Preset-Werte liegen nicht auf dem Raster (Volume in "Contrabass"
-         * ist 0,827), deshalb waeren sonst runde Werte nie erreichbar -- man
-         * kaeme von 83 nur auf 81, 79, 77. Der erste Klick rastet auf das
-         * Prozentraster ein, danach geht jeder ganze Wert.
+         * Work in whole percent rather than adding an amount. The preset
+         * values do not sit on the grid ("Contrabass" has volume 0.827), so
+         * round values would otherwise be unreachable -- from 83 you would
+         * only ever get 81, 79, 77. The first click snaps onto the percent
+         * grid, after which every whole value is reachable.
          */
         int pct = (int) (shadow_[id] * 100.0f + 0.5f);
         pct += delta;
@@ -165,7 +166,7 @@ void SM_Controller::adjust(int slot, int delta)
 }
 
 /* ------------------------------------------------------------------------ */
-/* Anzeige                                                                   */
+/* Display                                                                   */
 /* ------------------------------------------------------------------------ */
 void SM_Controller::formatValue(int id, char* dst, size_t n) const
 {
@@ -200,7 +201,7 @@ void SM_Controller::paramBText(char* dst, size_t n) const
 }
 
 /* ------------------------------------------------------------------------ */
-/* Persistenz                                                                */
+/* Persistence                                                               */
 /* ------------------------------------------------------------------------ */
 void SM_Controller::exportSettings(SmSettingsV1& s) const
 {
@@ -216,8 +217,8 @@ void SM_Controller::importSettings(const SmSettingsV1& s)
     midiCh_  = (s.midiCh <= SM_MIDI_OMNI) ? s.midiCh : SM_MIDI_OMNI;
     midi_.setRxChannel(midiCh_);
 
-    /* Erst das Programm setzen, dann die abweichenden Parameter darueber --
-     * so bleibt die Reihenfolge dieselbe wie beim Bedienen. */
+    /* Set the program first, then lay the deviating parameters on top --
+     * that keeps the order the same as when operating the panel. */
     ipc_send_param(SM_PARAM_PROGRAM, (uint16_t) program_);
 
     for (int i = 0; i < SOLINA_PARAM_COUNT; ++i)

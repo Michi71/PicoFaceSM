@@ -1,10 +1,9 @@
 /*
-  solina_dsp.h -- Filter- und Hilfsbausteine
+  solina_dsp.h -- filter and helper building blocks
 
-  Ein-Pol-Filter und Wellenformer sind aus string-machine uebernommen
-  (sources/dsp/OnePoleFilter.h, sources/dsp/AsymWaveshaper.dsp), auf
-  einfache Genauigkeit umgestellt (der RP2350 hat nur eine
-  Single-Precision-FPU).
+  The one-pole filters and the waveshaper are taken from string-machine
+  (sources/dsp/OnePoleFilter.h, sources/dsp/AsymWaveshaper.dsp) and converted
+  to single precision, because the RP2350 only has a single-precision FPU.
 */
 
 #ifndef SOLINA_DSP_H
@@ -18,7 +17,7 @@
 #endif
 
 /* ------------------------------------------------------------------------ */
-/* Ein-Pol-Tiefpass (string-machine: OnePoleLPF)                            */
+/* One-pole low-pass (string-machine: OnePoleLPF)                           */
 /* ------------------------------------------------------------------------ */
 class SolinaLPF1
 {
@@ -42,7 +41,7 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
-/* Ein-Pol-Hochpass (string-machine: OnePoleHPF)                            */
+/* One-pole high-pass (string-machine: OnePoleHPF)                          */
 /* ------------------------------------------------------------------------ */
 class SolinaHPF1
 {
@@ -69,7 +68,7 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
-/* Biquad (RBJ-Kochbuch): Tiefpass mit Guete und High-Shelf                 */
+/* Biquad (RBJ cookbook): low-pass with Q, and high shelf                   */
 /* ------------------------------------------------------------------------ */
 class SolinaBiquad
 {
@@ -121,15 +120,15 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
-/* Asymmetrischer Soft-Clipper (string-machine: AsymWaveshaper.dsp)          */
+/* Asymmetric soft clipper (string-machine: AsymWaveshaper.dsp)              */
 /*                                                                           */
 /*     kubic(k,x) = x - (k*x)^3/3                                            */
 /*     nl(k,x)    = x > 0 ? x : kubic(k, max(x, lm(k)))                      */
-/*     lm(k)      = -sqrt(k^3)/k^3   (lokales Minimum)                       */
+/*     lm(k)      = -sqrt(k^3)/k^3   (local minimum)                         */
 /*     y          = nl(k, x - 2/3) + 2/3                                     */
 /*                                                                           */
-/* Modelliert die einseitige Begrenzung der Torschaltung; erzeugt geradzahlige*/
-/* Harmonische, die dem Klang die "Streicher"-Rauheit geben.                 */
+/* Models the one-sided limiting of the gate circuit; it produces the even   */
+/* harmonics that give the sound its "strings" roughness.                    */
 /* ------------------------------------------------------------------------ */
 class SolinaShaper
 {
@@ -142,16 +141,16 @@ public:
         lm_ = -sqrtf(k * k * k) / (k * k * k);
 
         /*
-         * Die Kennlinie geht nicht durch den Ursprung: bei Eingang 0 liefert
-         * sie einen Gleichanteil (0,099 bei Amount 1,0). Ueber fuenf
-         * Tastaturgruppen und zwei Streicherregister summiert ergibt das beim
-         * Einschalten einen Sprung, den die Gleichspannungssperre dahinter
-         * erst in einigen Millisekunden abbaut -- hoerbar als Plopp.
+         * The curve does not pass through the origin: at input 0 it returns a
+         * DC offset (0.099 at amount 1.0). Summed over five keyboard groups
+         * and two string registers, that produces a step at power-up which
+         * the DC blocker behind it only removes over some milliseconds --
+         * audible as a plop.
          *
-         * string-machine haengt in AsymWaveshaper.dsp direkt hinter den
-         * Wellenformer ein fi.dcblockerat(35.). Den Nullpunkt abzuziehen ist
-         * dasselbe Ergebnis ohne Filter: kein Einschwingen, keine
-         * Phasendrehung im Bass, keine Rechenzeit.
+         * string-machine hangs a fi.dcblockerat(35.) directly behind the
+         * waveshaper in AsymWaveshaper.dsp. Subtracting the zero point gives
+         * the same result without a filter: no settling time, no phase shift
+         * in the bass, no CPU cost.
          */
         offset_ = shape(0.0f);
     }
@@ -178,7 +177,7 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
-/* Gleichspannungssperre                                                     */
+/* DC blocker                                                                */
 /* ------------------------------------------------------------------------ */
 class SolinaDCBlock
 {
@@ -203,13 +202,13 @@ private:
 };
 
 /* ------------------------------------------------------------------------ */
-/* Sinustabelle fuer die Steueroszillatoren                                  */
+/* Sine table for the control oscillators                                    */
 /*                                                                           */
-/* Das Ensemble braucht sechs Sinuswerte je Abtastwert (zwei Reihen mal drei */
-/* Phasen). Auf dem RP2350 waeren das rund 265000 sinf-Aufrufe pro Sekunde;  */
-/* der Cortex-M33 rechnet die in Software. string-machine loest das in       */
-/* LFO3PhaseDual.dsp genauso ueber eine kleine interpolierte Tabelle         */
-/* (smallTableSin, 128 Werte).                                               */
+/* The ensemble needs six sine values per sample (two rows times three       */
+/* phases). On the RP2350 that would be roughly 265000 sinf calls a second,  */
+/* and the Cortex-M33 computes those in software. string-machine solves it   */
+/* the same way in LFO3PhaseDual.dsp, through a small interpolated table     */
+/* (smallTableSin, 128 entries).                                             */
 /* ------------------------------------------------------------------------ */
 #define SOLINA_SINTAB_BITS 8
 #define SOLINA_SINTAB_SIZE (1 << SOLINA_SINTAB_BITS)
@@ -227,7 +226,7 @@ public:
                            / (float) SOLINA_SINTAB_SIZE);
     }
 
-    /* Phase 0..1 -> Sinus, linear interpoliert */
+    /* Phase 0..1 -> sine, linearly interpolated */
     static inline float lookup(float phase)
     {
         const float x  = phase * (float) SOLINA_SINTAB_SIZE;
@@ -239,17 +238,17 @@ public:
 
 private:
     static bool  inited_;
-    /* ein Wert mehr, damit die Interpolation ohne Sonderfall auskommt */
+    /* one entry more, so the interpolation needs no special case */
     static float tab_[SOLINA_SINTAB_SIZE + 1];
 };
 
 /* ------------------------------------------------------------------------ */
-/* Weiche Begrenzung der Endstufe                                            */
+/* Soft limiting of the output stage                                         */
 /*                                                                           */
-/* Der Output Amplifier des Originals begrenzt an seinen +/-15-V-Schienen    */
-/* weich. Unterhalb der Schwelle ist die Kennlinie exakt linear, darueber    */
-/* laeuft sie asymptotisch gegen 1.0 -- der Ausgang kann also nie ueber      */
-/* 0 dBFS gehen, waehrend normales Spiel voellig unberuehrt bleibt.          */
+/* The Output Amplifier of the original limits softly against its +/-15 V    */
+/* rails. Below the threshold the curve is exactly linear, above it the      */
+/* curve approaches 1.0 asymptotically -- so the output can never exceed     */
+/* 0 dBFS while normal playing is left completely untouched.                 */
 /* ------------------------------------------------------------------------ */
 static inline float solinaSoftClip(float x, float threshold)
 {
@@ -263,11 +262,11 @@ static inline float solinaSoftClip(float x, float threshold)
 }
 
 /* ------------------------------------------------------------------------ */
-/* Bandbegrenzter Saegezahn (polyBLEP)                                       */
+/* Band-limited sawtooth (polyBLEP)                                          */
 /*                                                                           */
-/* Phase und Schrittweite kommen aus dem Teilerwerk, sind also exakte        */
-/* Zweierpotenzverhaeltnisse zueinander -- genau wie im Original, wo alle    */
-/* Toene aus einem Master-Oszillator geteilt werden.                         */
+/* Phase and step size come from the divider chain, so they are exact powers */
+/* of two relative to each other -- just as in the original, where every     */
+/* note is divided down from one master oscillator.                          */
 /* ------------------------------------------------------------------------ */
 static inline float solinaPolyBlep(float t, float dt)
 {

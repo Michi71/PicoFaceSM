@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# build_solina.sh -- macOS-Host-Build fuer die Solina-Engine
-# Kompiliert die *unveraenderte* Pico-Engine (src/solina/) zusammen mit
-# test/solina_test.cpp gegen CoreAudio + PortMidi. Das Pico-Audio-Subsystem
-# wird ueber -DSOLINA_HOST_BUILD ausgeblendet (siehe Guard in
+# build_solina.sh -- macOS host build of the Solina engine
+# Compiles the *unmodified* Pico engine (src/solina/) together with
+# test/solina_test.cpp against CoreAudio + PortMidi. The Pico audio subsystem
+# is switched out through -DSOLINA_HOST_BUILD (see the guard in
 # include/solina/solina_defs.h).
 set -e
 

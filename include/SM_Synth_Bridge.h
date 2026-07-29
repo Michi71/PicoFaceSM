@@ -1,15 +1,15 @@
 /*
-  SM_Synth_Bridge.h -- Anbindung der Solina-Engine an das Pico-Audio-Subsystem
+  SM_Synth_Bridge.h -- wiring the Solina engine to the Pico audio subsystem
 
-  Die Bruecke ist bewusst duenn: die Engine rendert bereits blockweise nach
-  Float und bringt ihre eigene weiche Begrenzung mit. Hier bleibt das
-  Umsetzen auf das int32-Stereoformat des I2S-Puffers, das Haltepedal und
-  die Lastmessung.
+  The bridge is deliberately thin: the engine already renders in blocks of
+  float and brings its own soft limiter. What is left here is the conversion
+  to the int32 stereo format of the I2S buffer, the sustain pedal and the
+  load measurement.
 
-  Aufteilung wie im Master-Projekt PicoFaceRD: der Produzent laeuft im
-  Main-Loop von Core 0, der DMA-IRQ bleibt mikroskopisch. Einen Worker auf
-  Core 1 braucht die Solina nicht -- die Engine kostet auf dem Host 0,33 %
-  eines M4-Cores bei zehn Tasten.
+  The split follows the master project PicoFaceRD: the producer runs in the
+  main loop on core 0 and the DMA IRQ stays microscopic. The Solina needs no
+  worker on core 1 -- on the host the engine costs 0.33 % of one M4 core with
+  ten keys held.
 */
 
 #ifndef SM_SYNTH_BRIDGE_H
@@ -23,7 +23,7 @@ class SM_Synth_Bridge
 public:
     void init();
 
-    /* Fuellt einen I2S-Puffer (Stereo, int32 interleaved). */
+    /* Fills one I2S buffer (stereo, int32 interleaved). */
     void fill_buffer_i32(int32_t* out, int length);
 
     /* --- MIDI ---------------------------------------------------------- */
@@ -51,7 +51,7 @@ public:
 
     uint32_t currentSampleRate() const { return SAMPLING_RATE; }
 
-    /* --- Diagnose (Fusszeile des Displays) ----------------------------- */
+    /* --- Diagnostics (display footer) ---------------------------------- */
     int      cpuLoadPeakPercent() const { return cpuPeak_; }
     void     resetCpuPeak()             { cpuPeak_ = 0; }
     uint32_t noteOnCount() const        { return noteOnCount_; }

@@ -1,14 +1,14 @@
 /*
-  SM_Controller.h -- Bedienlogik fuer PicoFaceSM
+  SM_Controller.h -- front panel logic for PicoFaceSM
 
-  Drei Drehgeber wie im Master-Projekt: der erste blaettert durch die Seiten,
-  die beiden anderen bedienen die zwei Parameter der aktuellen Seite.
+  Three encoders as in the master project: the first pages through the
+  screens, the other two operate the two parameters of the current page.
 
-  Die Seitenaufteilung steht als Tabelle in SM_Controller.cpp -- Umsortieren
-  heisst dort eine Zeile verschieben, nicht Code aendern.
+  The page layout is a table in SM_Controller.cpp -- reordering it means
+  moving a line there, not changing code.
 
-  Der Controller haelt nur Schattenkopien fuer die Anzeige; die einzige
-  Wahrheit ist die Engine auf der Audioseite, erreicht ueber den IPC-Ring.
+  The controller only holds shadow copies for the display; the single source
+  of truth is the engine on the audio side, reached through the IPC ring.
 */
 
 #ifndef SM_CONTROLLER_H
@@ -20,10 +20,10 @@
 #include "sm_ipc.h"
 #include "sm_settings.h"
 
-/* Pseudo-Parameter-IDs oberhalb der Engine-Parameter */
+/* Pseudo parameter IDs above the engine parameters */
 enum {
-    SM_UI_PROGRAM = SOLINA_PARAM_COUNT,   /* Werksprogramm 0..7 */
-    SM_UI_MIDICH,                          /* Empfangskanal 0..15, 16 = Omni */
+    SM_UI_PROGRAM = SOLINA_PARAM_COUNT,   /* factory program 0..7 */
+    SM_UI_MIDICH,                          /* receive channel 0..15, 16 = omni */
     SM_UI_COUNT
 };
 
@@ -32,12 +32,12 @@ class SM_Controller
 public:
     explicit SM_Controller(SM_Midi& midi);
 
-    void onEncoder1(int delta);   /* Seite */
-    void onEncoder2(int delta);   /* Parameter A */
-    void onEncoder3(int delta);   /* Parameter B */
+    void onEncoder1(int delta);   /* page */
+    void onEncoder2(int delta);   /* parameter A */
+    void onEncoder3(int delta);   /* parameter B */
 
-    /* Taster des ersten Drehgebers: zurueck auf die erste Seite.
-     * Gibt true, wenn sich dadurch etwas geaendert hat. */
+    /* Push button of the first encoder: back to the first page.
+     * Returns true if that actually changed anything. */
     bool homePage();
 
     int         currentPage() const { return page_; }
@@ -51,11 +51,11 @@ public:
 
     uint8_t     midiChannel() const { return midiCh_; }
 
-    /* Persistenz */
+    /* Persistence */
     void exportSettings(SmSettingsV1& s) const;
     void importSettings(const SmSettingsV1& s);
 
-    /* Beim Programmwechsel ueber MIDI die Schattenkopien nachziehen */
+    /* Bring the shadow copies up to date after a MIDI program change */
     void syncFromProgram(int32_t program);
 
 private:
@@ -69,7 +69,7 @@ private:
     uint8_t  midiCh_ = SM_MIDI_OMNI;
     int32_t  program_ = 2;
 
-    /* Schattenkopien der Engine-Parameter, 0..1 */
+    /* Shadow copies of the engine parameters, 0..1 */
     float    shadow_[SOLINA_PARAM_COUNT] = {};
 };
 

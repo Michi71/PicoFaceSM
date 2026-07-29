@@ -1,5 +1,5 @@
 /*
-  SM_Synth_Bridge.cpp -- Anbindung der Solina-Engine an das Audio-Subsystem
+  SM_Synth_Bridge.cpp -- wiring the Solina engine to the audio subsystem
 */
 
 #include "SM_Synth_Bridge.h"
@@ -24,9 +24,9 @@ void SM_Synth_Bridge::init()
 }
 
 /*
- * Der I2S-Puffer erwartet Stereo-int32 interleaved. Die Engine liefert Float
- * und begrenzt bereits weich (solinaSoftClip), deshalb genuegt hier die
- * Skalierung -- ein zweiter Begrenzer wuerde nur doppelt verzerren.
+ * The I2S buffer expects interleaved stereo int32. The engine delivers float
+ * and already limits softly (solinaSoftClip), so scaling is all that is
+ * needed here -- a second limiter would only distort twice.
  */
 void RAM_HOT(SM_Synth_Bridge::fill_buffer_i32)(int32_t* out, int length)
 {
@@ -47,13 +47,16 @@ void RAM_HOT(SM_Synth_Bridge::fill_buffer_i32)(int32_t* out, int length)
         for (int i = 0; i < chunk; ++i)
         {
             /*
-             * Das I2S-Format ist S32: der Abtastwert muss linksbuendig im
-             * 32-Bit-Wort stehen. Hier auf 24 Bit skaliert und um 8 Bit nach
-             * oben geschoben -- das Master-Projekt nutzt 16 Bit mit << 16,
-             * die PIO schiebt so oder so 32 Bit hinaus.
+             * The I2S format is S32: the sample has to sit left-aligned in
+             * the 32-bit word. Here it is scaled to 24 bits and shifted up by
+             * 8 -- the master project uses 16 bits with << 16, and the PIO
+             * shifts out 32 bits either way.
              *
-             * Die Engine begrenzt bereits weich auf +/-1, die Klemmung ist
-             * nur Absicherung gegen Rundung.
+             * Omitting this shift is exactly what produced the "no sound at
+             * all" symptom: the output measured -111.5 dBFS instead of -15.2.
+             *
+             * The engine already limits softly to +/-1; the clamp is only a
+             * guard against rounding.
              */
             int32_t dl = (int32_t) (l[i] * 8388607.0f);
             int32_t dr = (int32_t) (r[i] * 8388607.0f);
@@ -69,7 +72,7 @@ void RAM_HOT(SM_Synth_Bridge::fill_buffer_i32)(int32_t* out, int length)
         done += chunk;
     }
 
-    /* Lastanzeige: verbrauchte Zeit gegen die Zeit, die der Block dauert */
+    /* Load readout: time spent against the time the block represents */
     const uint32_t used = bridge_time_us_32() - t0;
     const uint32_t avail = (uint32_t) ((1000000ull * (uint64_t) length) / SAMPLING_RATE);
     if (avail > 0)

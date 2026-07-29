@@ -1,13 +1,14 @@
 /*
-  sm_main.cpp -- PicoFaceSM, ARP Solina String Ensemble auf dem RP2350
+  sm_main.cpp -- PicoFaceSM, ARP Solina String Ensemble on the RP2350
 
-  Aufbau wie im Master-Projekt PicoFaceRD:
-      Core 0  Audioproduzent im Main-Loop, dazu USB, MIDI, Bedienung, Anzeige
-      IRQ     mikroskopisch, damit die naechste DMA-Uebertragung immer
-              rechtzeitig neu scharf gemacht wird
+  Structured like the master project PicoFaceRD:
+      Core 0  audio producer in the main loop, plus USB, MIDI, controls and
+              display
+      IRQ     microscopic, so the next DMA transfer is always re-armed in
+              time
 
-  Anders als bei RD gibt es keinen Stimmenrechner auf Core 1: die Solina
-  braucht ihn nicht. Core 1 bleibt vorerst ungenutzt.
+  Unlike RD there is no voice worker on core 1: the Solina does not need one.
+  Core 1 stays unused for now.
 */
 
 #include <stdio.h>
@@ -47,7 +48,7 @@
 #include "push_button.h"
 
 /* ------------------------------------------------------------------------ */
-/* Globale Instanzen                                                         */
+/* Global instances                                                          */
 /* ------------------------------------------------------------------------ */
 Encoder encSel(pio1, 0, {PIN_SEL_CLK, PIN_SEL_DT}, PIN_UNUSED, NORMAL_DIR, ROTARY_CPR, false, 444);
 Encoder encA(pio1, 1, {PIN_PA_CLK, PIN_PA_DT}, PIN_UNUSED, NORMAL_DIR, ROTARY_CPR, false, 444);
@@ -59,7 +60,7 @@ PushButton btB(PIN_PB_SW, 50);
 
 audio_buffer_pool_t* ap = nullptr;
 static volatile uint32_t g_pio_stall_count = 0;
-static uint8_t g_ui_flush_row = 16;   /* 16 = untaetig, 0..15 = naechste halbe Kachelzeile */
+static uint8_t g_ui_flush_row = 16;   /* 16 = idle, 0..15 = next half tile row */
 u8g2_t u8g2;
 
 SM_Synth_Bridge smBridge;
@@ -68,7 +69,7 @@ SM_Midi         smMidi;
 SM_Controller   smController(smMidi);
 
 /* ------------------------------------------------------------------------ */
-/* IPC-Anwendung auf der Audioseite                                          */
+/* Applying IPC packets on the audio side                                    */
 /* ------------------------------------------------------------------------ */
 static void ipc_apply(uint32_t pkt)
 {
@@ -111,16 +112,16 @@ static void ipc_apply(uint32_t pkt)
 }
 
 /*
- * veeprom-Sperrhaken: es gibt nichts zu parken. Der Schreibvorgang laeuft auf
- * Core 0 zwischen zwei Audiobloecken, Core 1 ist untaetig. veeprom schaltet
- * die Interrupts selbst ab und stellt das QMI-Timing danach wieder her.
+ * veeprom lock hooks: there is nothing to park. The write runs on core 0
+ * between two audio blocks and core 1 is idle. veeprom disables the
+ * interrupts itself and restores the QMI timing afterwards.
  */
 static bool sm_flash_lock(void)   { return true; }
 static void sm_flash_unlock(void) {}
 
 extern "C" void __not_in_flash_func(i2s_callback_func)()
 {
-    /* Das Rendern laeuft im Main-Loop; der IRQ bleibt absichtlich winzig. */
+    /* Rendering happens in the main loop; the IRQ stays deliberately tiny. */
     if (!ap) return;
     g_pio_stall_count += audio_i2s_consume_txstall();
 }
@@ -158,7 +159,7 @@ int main(void)
     u8g2_ClearBuffer(&u8g2);
     SM_MARK("display ok");
 
-    /* Startbild zwei Sekunden halten, USB dabei am Leben lassen */
+    /* Hold the splash screen for two seconds, keeping USB alive */
     sm_display_splash(&u8g2);
     absolute_time_t splash_end = make_timeout_time_ms(2000);
     while (!time_reached(splash_end)) { tud_task(); sleep_ms(1); }
@@ -195,8 +196,8 @@ int main(void)
     usbmidi.setPitchBendCallback(sm_pb_cb);
 
 #if SM_SAFE_MODE
-    /* Sicherheitsmodus: ein gehaltener Akkord, damit sich der Audioweg ohne
-     * MIDI pruefen laesst. Kommt hier nichts, liegt es nicht am MIDI-Weg. */
+    /* Safe mode: a held chord, so the audio path can be checked without
+     * MIDI. If nothing comes out here, the MIDI path is not the cause. */
     smBridge.noteOn(48, 100);
     smBridge.noteOn(55, 100);
     smBridge.noteOn(64, 100);
@@ -212,7 +213,7 @@ int main(void)
 
     while (true)
     {
-        /* Produzent im Thread-Kontext: von allen IRQs unterbrechbar. */
+        /* Producer in thread context: interruptible by every IRQ. */
         audio_buffer_t* buffer;
         while ((buffer = take_audio_buffer(ap, false)) != nullptr)
         {
@@ -228,8 +229,8 @@ int main(void)
 
         if (g_ui_flush_row < 16)
         {
-            /* Anzeige in halben Kachelzeilen ausgeben (~1,5 ms I2C je Stueck),
-             * damit der Audiovorlauf nicht wegbricht. */
+            /* Push the display out in half tile rows (~1.5 ms of I2C each),
+             * so the audio lead does not collapse. */
             u8g2_UpdateDisplayArea(&u8g2, (g_ui_flush_row & 1) ? 8 : 0,
                                    (uint8_t) (g_ui_flush_row >> 1), 8, 1);
             g_ui_flush_row++;
@@ -238,11 +239,10 @@ int main(void)
         tud_task();
         usbmidi.process();
 
-        /* Taster des ersten Drehgebers: zurueck auf Seite 1. Toggled() feuert
-         * auf beide Flanken, deshalb zusaetzlich auf den gedrueckten Zustand
-         * pruefen -- sonst loest das Loslassen ein zweites Mal aus. Der
-         * Seitenwechsel aendert keinen Parameter und macht die Einstellungen
-         * daher nicht schmutzig. */
+        /* Push button of the first encoder: back to page 1. Toggled() fires
+         * on both edges, so the pressed state is checked as well -- otherwise
+         * releasing would trigger a second time. Changing page alters no
+         * parameter and therefore does not mark the settings dirty. */
         if (btSel.Toggled() && btSel.ReadButton() == PushButton::PRESSED)
         {
             if (smController.homePage())
@@ -259,9 +259,8 @@ int main(void)
 
         uint32_t now = to_ms_since_boot(get_absolute_time());
 
-        /* Entprellte Speicherung im Leerlauf. Nur Drehgeberbedienung macht den
-         * Zustand schmutzig -- ueber MIDI gefahrene Aenderungen sind
-         * absichtlich fluechtig. */
+        /* Debounced save while idle. Only encoder operation marks the state
+         * dirty -- changes driven over MIDI are deliberately transient. */
         static bool settingsDirty = false;
         static uint32_t lastEditMs = 0;
         if (d1 || d2 || d3) { settingsDirty = true; lastEditMs = now; }
@@ -291,7 +290,7 @@ int main(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/* Anzeige                                                                   */
+/* Display                                                                   */
 /* ------------------------------------------------------------------------ */
 static void sm_ui_draw()
 {
@@ -305,7 +304,7 @@ static void sm_ui_draw()
     smController.paramAText(va, sizeof(va));
     smController.paramBText(vb, sizeof(vb));
 
-    /* Leere Beschriftung = der Wert beschreibt sich selbst (siehe kNames). */
+    /* Empty label = the value describes itself (see kNames). */
     const char* na = smController.paramAName();
     const char* nb = smController.paramBName();
     if (na[0]) snprintf(m.lineA, sizeof(m.lineA), "%s %s", na, va);
@@ -322,7 +321,7 @@ static void sm_ui_draw()
 
     sm_display_page(&u8g2, m);
 
-    /* Kein blockierendes SendBuffer hier -- der Main-Loop schiebt den Puffer
-     * zeilenweise heraus. */
+    /* No blocking SendBuffer here -- the main loop pushes the buffer out
+     * row by row. */
     g_ui_flush_row = 0;
 }
