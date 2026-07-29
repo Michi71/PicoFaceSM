@@ -141,18 +141,56 @@ to core 1 is necessary.
 
 | Option | Default | |
 |---|---|---|
-| `SM_CLOCK_480` | `OFF` | 480 MHz instead of 444 MHz |
 | `SM_DOUBLE_RESET` | `OFF` | double-tap RESET enters BOOTSEL |
 | `SM_PHASER` | `ON` | compile the phaser |
 | `SM_SAFE_MODE` | `OFF` | no veeprom, continuous test chord, UART progress marks |
 
-### Why 444 MHz instead of 480 MHz
+### The 480 MHz boot failure, and what it actually was
 
-Measured, not guessed: on this board the firmware does not start reliably at
-480 MHz, but is stable at 444 MHz. The comment in `pico_init()` already
-records that 504 MHz would not boot on this chip — 480 MHz was the fallback
-step and is evidently still too tight. There is plenty of compute headroom
-(peak load 40 % at 480 MHz, so roughly 43 % at 444 MHz).
+Worth recording, because it cost real time and the obvious explanation was
+wrong. For a while the firmware would not start at 480 MHz while 444 MHz was
+rock solid, which looked like the chip simply running out of silicon margin.
+It was not. The cause was the flash timing during the *transition*.
+
+`pico_init()` writes a conservative QMI `M0_TIMING` before raising `clk_sys`
+and the aggressive one after. Between those two writes the flash briefly runs
+at the new, high system clock with the *old* divider and `RXDELAY`:
+
+| target | transitional flash clock | steady-state flash clock |
+|---|---|---|
+| 444 MHz (old code) | 111 MHz @ `RXDELAY=2` | 148 MHz @ `RXDELAY=3` |
+| 480 MHz (old code) | **120 MHz @ `RXDELAY=2`** | 120 MHz @ `RXDELAY=3` |
+
+`RXDELAY` compensates a round-trip delay that is fixed in nanoseconds, so the
+value needed grows with `clk_sys`. `RXDELAY=2` was just enough at 111 MHz and
+just short at 120 MHz — the core hung on the first instruction fetch after the
+clock switch. Note the giveaway: the 480 MHz build ran the flash *slower* in
+steady state (120 MHz) than the 444 MHz build that worked (148 MHz), so the
+flash chip was never the limit. Only the transitional window was. 444 MHz was
+on the working side of that edge, but with no margin worth the name.
+
+The fix is `PICOFACE_QMI_M0_TIMING_SAFE` (`CLKDIV=8`, `RXDELAY=2`), which puts
+the window at 55 MHz. With it, 480 MHz booted reliably — the diagnosis was
+confirmed on the device rather than argued. 480 MHz was then removed again:
+peak load is 30–40 %, the Solina does not need the headroom, and at a core
+voltage of 1.60 V the slower clock is the kinder choice when it costs nothing.
+
+The same defect was present in
+[PicoFaceRD](https://github.com/Michi71/PicoFaceRD), PicoFaceCP, PicoFaceDX
+and PicoFaceYC, which share this hardware layer. RD ran at 480 MHz
+unconditionally and showed exactly this symptom — it would not restart after
+the USB cable was unplugged. All four have been fixed and confirmed.
+
+Two smaller things were corrected in the same place:
+
+- `__dsb()` / `__isb()` around the timing writes. The register write leaves
+  over APB while the instruction fetches that follow reach the same peripheral
+  over the XIP path — two routes to one endpoint, not ordered against each
+  other. The same barrier was missing in `veeprom.cpp`, where only a compiler
+  barrier guarded the post-flash-write timing restore.
+- `set_sys_clock_hz()` is called with `required=false` and its result was
+  discarded. On an unreachable target it silently leaves `clk_sys` at 150 MHz;
+  the aggressive flash timing is now only applied if the switch succeeded.
 
 ### Why double-tap RESET is disabled
 

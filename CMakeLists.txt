@@ -129,20 +129,12 @@ else()
     target_compile_definitions(picofacesm PRIVATE SM_SAFE_MODE=0)
 endif()
 
-# Systemtakt. ON = 480 MHz (wie das Master-Projekt), OFF = 444 MHz.
-#
-# Standard ist 444 MHz, und zwar gemessen: auf diesem Board startet die
-# Firmware bei 480 MHz nicht zuverlaessig, bei 444 MHz stabil. Der Kommentar
-# in pico_init() haelt schon fest, dass 504 MHz auf diesem Chip gar nicht
-# booteten -- 480 MHz war der Rueckfallschritt und ist offenbar ebenfalls zu
-# knapp. Die Rechenreserve reicht bequem: gemessene Spitzenlast 40 % bei
-# 480 MHz, also rund 43 % bei 444 MHz.
-option(SM_CLOCK_480 "Systemtakt 480 MHz statt 444 MHz" OFF)
-if (SM_CLOCK_480)
-    target_compile_definitions(picofacesm PRIVATE RD_CLOCK_504=1)
-else()
-    message(STATUS "PicoFaceSM: Systemtakt 444 MHz")
-endif()
+# Systemtakt fest auf 444 MHz, siehe pico_init(). 480 MHz lief nach dem
+# QMI-Umbau ebenfalls stabil, wurde aber wieder ausgebaut: die Spitzenlast
+# liegt bei 30..40 %, die Solina braucht die Mehrleistung schlicht nicht, und
+# bei 1,60 V Kernspannung -- schon deutlich ausserhalb der Datenblatt-
+# spezifikation -- ist der langsamere Takt die freundlichere Wahl, solange er
+# nichts kostet.
 
 target_compile_definitions(picofacesm PRIVATE
     USE_AUDIO_I2S=1

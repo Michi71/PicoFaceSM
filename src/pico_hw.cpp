@@ -3,6 +3,7 @@
 #include "hardware/clocks.h"
 #include <pico/stdlib.h>
 #include <hardware/vreg.h>
+#include <hardware/sync.h>
 #include <pico/multicore.h>
 
 #include "pico_hw.h"
@@ -79,21 +80,37 @@ void pico_init()
     }
 
 #if PICO_RP2350
-    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
     vreg_disable_voltage_limit();
     vreg_set_voltage(VREG_VOLTAGE_1_60);
-    sleep_ms(10);
-#ifdef RD_CLOCK_504
-    // RD target: 480 MHz with flash divider 4 (120 MHz QSPI, within spec).
-    // 504 MHz did not boot on this particular chip; 480 is the fallback step.
-    *qmi_m0_timing = 0x60007204;
-    set_sys_clock_hz(480000000, 0);
-    *qmi_m0_timing = PICOFACE_QMI_M0_TIMING_RD;  // CLKDIV=4, RXDELAY=3 for 120 MHz flash
-#else
-    *qmi_m0_timing = 0x60007204;
-    set_sys_clock_hz(444000000, 0);
-    *qmi_m0_timing = PICOFACE_QMI_M0_TIMING_OC;
-#endif
+    sleep_ms(10);   // switching regulator settles in tens of microseconds
+
+    // Raise clk_sys with the flash held at a slack timing across the switch.
+    //
+    // Ordering matters and is not free: the M0_TIMING write goes out over APB,
+    // while the instruction fetches that follow reach the same peripheral over
+    // the XIP path. Those are two routes to one endpoint and are not ordered
+    // against each other, so __dsb() is what actually guarantees the new timing
+    // is in effect before the next fetch, and __isb() discards anything already
+    // prefetched under the old one.
+    //
+    // set_sys_clock_hz() is called with required=false: on an unreachable
+    // target it returns false and silently leaves clk_sys at its default.
+    // 444 MHz is reachable via the PLL (VCO 1332 / 3), but if that ever changes
+    // we must not tighten the flash timing for a clock the part never got to --
+    // so keep the slack timing in that case. The symptom is then loud rather
+    // than subtle: the synth runs at 150 MHz and the load percentage on the
+    // status line goes through the roof.
+    volatile uint32_t *qmi_m0_timing = (uint32_t *)0x400d000c;
+
+    *qmi_m0_timing = PICOFACE_QMI_M0_TIMING_SAFE;
+    __dsb();
+    __isb();
+
+    const bool clockOk = set_sys_clock_hz(444000000, false);
+    *qmi_m0_timing = clockOk ? PICOFACE_QMI_M0_TIMING_OC
+                             : PICOFACE_QMI_M0_TIMING_SAFE;
+    __dsb();
+    __isb();
 #else
     hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
     sleep_ms(33);
