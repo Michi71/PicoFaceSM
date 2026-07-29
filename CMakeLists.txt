@@ -10,12 +10,32 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-set(PICO_EXTRAS_PATH "../lib/pico-extras")
+# pico-extras location. An explicit -DPICO_EXTRAS_PATH or the PICO_EXTRAS_PATH
+# environment variable wins; the in-tree submodule is the fallback. See the
+# PICO_SDK_PATH block below for why this is a fallback rather than a hard set.
+if(NOT PICO_EXTRAS_PATH AND NOT DEFINED ENV{PICO_EXTRAS_PATH})
+    set(PICO_EXTRAS_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/pico-extras")
+endif()
 
 set(PICO_PLATFORM "rp2350-arm-s")
 set(PICO_BOARD "sparkfun_promicro_rp2350")
 
-set(PICO_SDK_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/pico-sdk")
+# Pico SDK location, in order of precedence:
+#   1. -DPICO_SDK_PATH=... on the cmake command line
+#   2. the PICO_SDK_PATH environment variable
+#   3. the lib/pico-sdk submodule in this repository
+#
+# This used to be an unconditional set() placed before pico_sdk_import.cmake,
+# which silently overrode both of the first two -- the import script's own
+# environment handling could never take effect. Every checkout therefore needed
+# its own ~340 MB SDK tree (most of it btstack, which nothing here uses).
+#
+# CI passes neither, so it still builds from the submodule and the pinned SDK
+# version continues to be part of the repository. A local shared install is now
+# simply a matter of exporting PICO_SDK_PATH.
+if(NOT PICO_SDK_PATH AND NOT DEFINED ENV{PICO_SDK_PATH})
+    set(PICO_SDK_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lib/pico-sdk")
+endif()
 
 # Pico SDK einbinden (muss vor project() stehen)
 include(pico_sdk_import.cmake)
